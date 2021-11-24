@@ -22,7 +22,7 @@ import midesp.methods.SignificanceFinder;
 
 public class Main {
 
-	private static Path tpedFile, tfamFile, outFile;
+	private static Path tpedFile, tfamFile, outFile, snpListFile;
 	
 	private static boolean isContinuous = false;
 	
@@ -59,12 +59,17 @@ public class Main {
 			return false;
 		}
 		System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", Integer.toString(threadCount));
+		List<String> fileSigSNPIDsList = null;
+		List<SNP> fileSigSNPList = null;
 		List<SNP> snpList;
 		Phenotype pheno;
 		System.out.println("Reading data from files");
 		try {
 			snpList = SNP.readTPed(tpedFile);
 			pheno = Phenotype.readTFam(tfamFile, isContinuous);
+			if(snpListFile != null) {
+				fileSigSNPIDsList = Files.lines(snpListFile).collect(Collectors.toList());
+			}
 		}
 		catch(IOException e) {
 			System.out.println("Error while reading files");
@@ -74,6 +79,16 @@ public class Main {
 		}
 		System.out.println("Read phenotypes for " + pheno.getLength() + " samples");
 		System.out.println("Read data of " + snpList.size() + " SNPs");
+		if(fileSigSNPIDsList != null) {
+			List<String> allSNPIDs = snpList.parallelStream().map(SNP::getID).distinct().collect(Collectors.toList());
+			long foundCount = fileSigSNPIDsList.parallelStream().filter(snp -> allSNPIDs.contains(snp)).count();
+			System.out.println("Using " + foundCount + " SNPs from the given list as important instead of using the SNPs that are significant according to their MI value");
+			if(foundCount != fileSigSNPIDsList.size()) {
+				System.out.println((fileSigSNPIDsList.size()-foundCount) + " SNPs from the list could not be found in the tped file and will be ignored");
+			}
+			List<String> tmpList = fileSigSNPIDsList;
+			fileSigSNPList = snpList.parallelStream().filter(snp -> tmpList.contains(snp.getID())).collect(Collectors.toList());
+		}
 		System.out.println("Phenotype = " + (isContinuous ? "Continuous" : "Discrete"));
 		if(isContinuous) {
 			System.out.println("Number of neighbours for MI = " + kNext);
@@ -106,7 +121,12 @@ public class Main {
 		try {
 			sigSNPPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")));
 			sigSNPPW.println("SNP Entropy MI");
-			sigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+			if(fileSigSNPList == null) {
+				sigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+			}
+			else {
+				fileSigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+			}
 			sigSNPPW.close();
 		} catch (IOException e) {
 			System.out.println("Error while writing SNPs to file");
@@ -179,35 +199,79 @@ public class Main {
 		System.out.println("SigSNP-Mean = " + sigSNPList.parallelStream().mapToDouble(snp -> snp.getAverageMItoPheno()).average().getAsDouble());
 		System.out.println("Background-Mean = " + backgroundMeanEffect);
 		System.out.println("Overall-Mean = " + overallMeanEffect);
+
+		if(fileSigSNPList != null) {
+			System.out.println("Calculating SNP-specific average effects for single SNPs given in the list");
+			start = System.nanoTime();
+			fileSigSNPList.parallelStream().forEach(snp ->{
+				List<Integer> randIndices = new ArrayList<>(singleSNPMI_SigFinderResult.getZeroToLambda1Indices());
+				Collections.shuffle(randIndices);
+				double sum = 0.0;
+				for(int i = 0; i < apcAverageNumber; i++) {
+					if(isContinuous) {
+						sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					}
+					else {
+						sum += MICalculator.calcMI_DiscPheno(pheno, snp, snpList.get(randIndices.get(i)));
+					}
+				}
+				snp.setAverageMItoPheno(sum / apcAverageNumber);
+			});
+			System.out.println("FileSigSNP-Mean = " + fileSigSNPList.parallelStream().mapToDouble(snp -> snp.getAverageMItoPheno()).average().getAsDouble());
+			System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
+		}
 		System.out.println("Calculating MI values for SNP pairs");
-		long possiblePairCount = calcPossiblePairsCount(sigSNPList.size(), snpList.size());
+		long possiblePairCount = (fileSigSNPList == null) ? calcPossiblePairsCount(sigSNPList.size(), snpList.size()) : calcPossiblePairsCount(fileSigSNPList.size(), snpList.size());
 		int savePairCount = (int) (possiblePairCount * (keepPercentage / 100.0));
 		System.out.println("Saving top " + savePairCount + " pairs (" + keepPercentage + "% from " + possiblePairCount + " calculated pairs)");
 		LimitedPriorityQueue<MIResult> topResults = new LimitedPriorityQueue<>(savePairCount);
-		List<SNP> snpWithoutSigList = snpList.stream().filter(snp -> !sigSNPList.contains(snp)).collect(Collectors.toList());
-		List<SNP> targetSNPList = Stream.concat(sigSNPList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList());
+		List<SNP> tmpList = fileSigSNPList;
+		List<SNP> snpWithoutSigList = (fileSigSNPList == null) ? snpList.stream().filter(snp -> !sigSNPList.contains(snp)).collect(Collectors.toList()) : snpList.stream().filter(snp -> !tmpList.contains(snp)).collect(Collectors.toList());
+		List<SNP> targetSNPList = (fileSigSNPList == null) ? Stream.concat(sigSNPList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList()) : Stream.concat(tmpList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList());
 		if(targetSNPList.size() != snpList.size()) {
 			System.out.println("List sizes are not equal");
 			return false;
 		}
 		start = System.nanoTime();
-		for(int i = 0; i < sigSNPList.size(); i++) {
-			if(i % 10 == 0) {
-				System.out.println("Iteration " + i);
+		if(fileSigSNPList == null) {
+			for(int i = 0; i < sigSNPList.size(); i++) {
+				if(i % 10 == 0) {
+					System.out.println("Iteration " + i);
+				}
+				SNP firstSNP = sigSNPList.get(i);
+				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+					double mi;
+					if(isContinuous) {
+						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
+					}
+					else {
+						mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+					}
+					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
+					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
+				}).collect(Collectors.toList());
+				topResults.addAll(tempResults);
 			}
-			SNP firstSNP = sigSNPList.get(i);
-			List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
-				double mi;
-				if(isContinuous) {
-					mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
+		}
+		else {
+			for(int i = 0; i < fileSigSNPList.size(); i++) {
+				if(i % 10 == 0) {
+					System.out.println("Iteration " + i);
 				}
-				else {
-					mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
-				}
-				double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
-				return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
-			}).collect(Collectors.toList());
-			topResults.addAll(tempResults);
+				SNP firstSNP = fileSigSNPList.get(i);
+				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+					double mi;
+					if(isContinuous) {
+						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
+					}
+					else {
+						mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+					}
+					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
+					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
+				}).collect(Collectors.toList());
+				topResults.addAll(tempResults);
+			}
 		}
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Writing results to file");
@@ -280,6 +344,10 @@ public class Main {
 				threadCount = Integer.parseInt(args[i+1]);
 				i++;
 				break;
+			case "-list":
+				snpListFile = Paths.get(args[i+1]);
+				i++;
+				break;
 			}	
 		}
 		tpedFile = Paths.get(args[args.length-2]);
@@ -301,6 +369,7 @@ public class Main {
 		System.out.println("-k\t\tnumber\tset the value of k for MI estimation for continuous phenotypes (default = 30)");
 		System.out.println("-fdr\t\tnumber\tset the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)");
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
+		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
 	}
 	
 }
