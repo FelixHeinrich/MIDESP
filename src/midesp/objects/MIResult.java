@@ -15,6 +15,10 @@ public class MIResult implements Comparable<MIResult>{
 		this.mi_apc = mi_apc;
 	}
 	
+	public MIResult(String snp1, String snp2, double mi) {
+		this(snp1, snp2, mi, 0.0);
+	}
+	
 	public String getSNP1() {
 		return snp1;
 	}
@@ -36,13 +40,22 @@ public class MIResult implements Comparable<MIResult>{
 		return snp1 + " + " + snp2 + " " + mi + " " + mi_apc;
 	}
 	
+	public String toNoAPCString() {
+		return snp1 + " + " + snp2 + " " + mi;
+	}
+	
 	@Override
 	public int compareTo(MIResult o) {
 		if(this.mi_apc < o.mi_apc) {
 			return -1;
 		}
 		else if(this.mi_apc == o.mi_apc) {
-			return 0;
+			if(this.mi < o.mi) {
+				return -1;
+			} else if(this.mi == o.mi) {
+				return 0;
+			}
+			return 1;
 		}
 		return 1;
 	}

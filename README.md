@@ -39,6 +39,7 @@ Optional parameters:
 -fdr		number	set the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)
 -apc		number	set the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)
 -list		file	name of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value
+-noapc			indicate that the APC should not be applied
 ```
 ## Examples
 The datasets we analyzed in our publication can be found under [Tuberculosis](https://doi.org/10.5061/dryad.519bm) and [Eggweight](https://figshare.com/articles/dataset/Genome-wide_Association_Analysis_of_Age-Dependent_Egg_Weights_in_Chickens/5844420) (see also their corresponding publications [https://doi.org/10.1038/hdy.2013.137](https://doi.org/10.1038/hdy.2013.137) and [https://doi.org/10.3389/fgene.2018.00128](https://doi.org/10.3389/fgene.2018.00128)).
