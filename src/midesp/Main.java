@@ -25,6 +25,7 @@ public class Main {
 	private static Path tpedFile, tfamFile, outFile, snpListFile;
 	
 	private static boolean isContinuous = false;
+	private static boolean isNoAPC = false;
 	
 	private static double keepPercentage = 1;
 	
@@ -133,8 +134,80 @@ public class Main {
 			e.printStackTrace();
 			return false;
 		}
+		if(isNoAPC) {
+			System.out.println("Calculating MI values for SNP pairs");
+			long possiblePairCount = (fileSigSNPList == null) ? calcPossiblePairsCount(sigSNPList.size(), snpList.size()) : calcPossiblePairsCount(fileSigSNPList.size(), snpList.size());
+			int savePairCount = (int) (possiblePairCount * (keepPercentage / 100.0));
+			System.out.println("Saving top " + savePairCount + " pairs (" + keepPercentage + "% from " + possiblePairCount + " calculated pairs)");
+			LimitedPriorityQueue<MIResult> topResults = new LimitedPriorityQueue<>(savePairCount);
+			List<SNP> tmpList = fileSigSNPList;
+			List<SNP> snpWithoutSigList = (fileSigSNPList == null) ? snpList.stream().filter(snp -> !sigSNPList.contains(snp)).collect(Collectors.toList()) : snpList.stream().filter(snp -> !tmpList.contains(snp)).collect(Collectors.toList());
+			List<SNP> targetSNPList = (fileSigSNPList == null) ? Stream.concat(sigSNPList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList()) : Stream.concat(tmpList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList());
+			if(targetSNPList.size() != snpList.size()) {
+				System.out.println("List sizes are not equal");
+				return false;
+			}
+			start = System.nanoTime();
+			if(fileSigSNPList == null) {
+				for(int i = 0; i < sigSNPList.size(); i++) {
+					if(i % 10 == 0) {
+						System.out.println("Iteration " + i);
+					}
+					SNP firstSNP = sigSNPList.get(i);
+					List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+						double mi;
+						if(isContinuous) {
+							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
+						}
+						else {
+							mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+						}
+						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
+					}).collect(Collectors.toList());
+					topResults.addAll(tempResults);
+				}
+			}
+			else {
+				for(int i = 0; i < fileSigSNPList.size(); i++) {
+					if(i % 10 == 0) {
+						System.out.println("Iteration " + i);
+					}
+					SNP firstSNP = fileSigSNPList.get(i);
+					List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+						double mi;
+						if(isContinuous) {
+							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
+						}
+						else {
+							mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+						}
+						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
+					}).collect(Collectors.toList());
+					topResults.addAll(tempResults);
+				}
+			}
+			System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
+			System.out.println("Writing results to file");
+			PrintWriter outPW;
+			try {
+				outPW = new PrintWriter(Files.newBufferedWriter(outFile));
+				outPW.println("SNP1 + SNP2 MI");
+				while(!topResults.isEmpty()) {
+					MIResult result = topResults.poll();
+					outPW.println(result.toNoAPCString());
+				}
+				outPW.close();
+			}
+			catch(IOException e) {
+				System.out.println("Error while writing results to file");
+				e.printStackTrace();
+				return false;
+			}
+			return true;
+		}
 		if(singleSNPMI_SigFinderResult.getZeroToLambda1Indices().size() < apcAverageNumber || singleSNPMI_SigFinderResult.getBackgroundIndices().size() < sigSNPList.size()) {
-			System.out.println("Not enough SNPs to calculate APC averages. Use a smaller value for -apc.");
+			System.out.println("Not enough SNPs to calculate APC averages. Use a smaller value for -apc or deactive APC with -noapc.");
+			System.out.println("Maximum possible value for current dataset is " + singleSNPMI_SigFinderResult.getZeroToLambda1Indices().size());
 			return false;
 		}
 		System.out.println("Calculating SNP-specific average effects for significantly associated single SNPs");
@@ -348,12 +421,20 @@ public class Main {
 				snpListFile = Paths.get(args[i+1]);
 				i++;
 				break;
+			case "-noapc":
+				isNoAPC = true;
+				break;
 			}	
 		}
 		tpedFile = Paths.get(args[args.length-2]);
 		tfamFile = Paths.get(args[args.length-1]);
 		if(tmpOutFile == null) {
-			outFile = Paths.get(args[args.length-2] + ".epi");
+			if(isNoAPC) {
+				outFile = Paths.get(args[args.length-2] + ".epiNoAPC");
+			}
+			else {
+				outFile = Paths.get(args[args.length-2] + ".epi");
+			}
 		}
 		else {
 			outFile = tmpOutFile;
@@ -370,6 +451,7 @@ public class Main {
 		System.out.println("-fdr\t\tnumber\tset the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)");
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
 		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
+		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
 	}
 	
 }
