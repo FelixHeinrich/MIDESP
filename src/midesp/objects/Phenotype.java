@@ -3,13 +3,15 @@ package midesp.objects;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import midesp.methods.MICalculator;
 
@@ -95,28 +97,18 @@ public class Phenotype{
 	}	
 	
 	public void parseValues() {	
-		Random rng = new Random();
 		if(isContinuous) {
-			rng.setSeed(42);
-			//Check for duplicate values and add noise to guarantee uniqueness of values
-			while(Arrays.stream(contPhenotypeVec).distinct().count() != length) {
-				//Adding small noise as suggested by Kraskov et al in "Estimating Mutual Information"
-				for(int i = 0; i < length; i++) {
-					contPhenotypeVec[i] += rng.nextGaussian() * 1e-10;
-				}
-			}
-			//Normalize the phenotype to the interval [0;1]
-			contPhenotypeVec = MICalculator.minMaxNormalization(contPhenotypeVec);
 			//Create sorted lists of neighbors for each entry
-			closestNeighborsMat = Arrays.stream(contPhenotypeVec).mapToObj(value ->{
-				return IntStream.range(0, length).boxed().sorted((o1, o2) -> {
-					if(Math.abs(value - contPhenotypeVec[o1]) < Math.abs(value - contPhenotypeVec[o2])) {
-						return -1;
-					}	
-					else {
-						return 1;
+			closestNeighborsMat = IntStream.range(0, length).mapToObj(index ->{
+				double currentValue = contPhenotypeVec[index];
+				List<Pair<Integer,Double>> pairList = new ArrayList<>();
+				for(int i = 0; i < length; i++) {
+					if(i != index) {
+						pairList.add(new Pair<>(i, Math.abs(currentValue - contPhenotypeVec[i])));
 					}
-				}).mapToInt(i -> i).toArray();
+				}
+				pairList.sort(Comparator.comparing(o -> o.getSecond()));
+				return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.getFirst()).boxed()).mapToInt(i->i).toArray();
 			}).toArray(int[][]::new);
 			//Calculate distances between the entry and its neighbors
 			closestNeighborsDistMat = IntStream.range(0, length).mapToObj(i ->{

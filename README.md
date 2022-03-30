@@ -6,10 +6,12 @@ MIDESP calculates the mutual information between SNP pairs and phenotypes and re
 
 Genotype and phenotype data needs to be in the `tped` and `tfam` format used by [PLINK](https://www.cog-genomics.org/plink/1.9/formats).
 
-The program will create two files:
+The program by default will create two files:
 
 - `outputfile.sigSNPs` which contains a list of the SNPs that were found as being strongly associated to the phenotype along with their entropy and the mutual information between the SNP and the phenotype
 - `outputfile.epi` which contains a list of the top SNP pairs that show the strongest association to the phenotype along with the mutual information between the SNP pair and the phenotype and the mutual information corrected through application of the APC theorem
+
+For datasets with a small number of SNPs (e.g. < 5,000) it is recommended to deactivate APC with the optional parameter `-noapc`.
 
 ## Requirements
 
@@ -40,6 +42,7 @@ Optional parameters:
 -apc		number	set the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)
 -list		file	name of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value
 -noapc			indicate that the APC should not be applied
+-all			write an additional file containing the MI values for all SNPs (outputfile.allSNPs)
 ```
 ## Examples
 The datasets we analyzed in our publication can be found under [Tuberculosis](https://doi.org/10.5061/dryad.519bm) and [Eggweight](https://figshare.com/articles/dataset/Genome-wide_Association_Analysis_of_Age-Dependent_Egg_Weights_in_Chickens/5844420) (see also their corresponding publications [https://doi.org/10.1038/hdy.2013.137](https://doi.org/10.1038/hdy.2013.137) and [https://doi.org/10.3389/fgene.2018.00128](https://doi.org/10.3389/fgene.2018.00128)).
@@ -99,3 +102,7 @@ java -jar MIDESP.jar -threads 70 -out Tuberculosis_Filtered_Pruned.epi -keep 0.1
 ## License
 
 This project is licensed under the **GPL-3.0 License** - see [LICENSE](LICENSE) for more information.
+
+## Citation
+
+Heinrich, F.; Ramzan, F.; Rajavel, A.; Schmitt, A.O.; Gültas, M. MIDESP: Mutual Information-Based Detection of Epistatic SNP Pairs for Qualitative and Quantitative Phenotypes. Biology 2021, 10, 921. [https://doi.org/10.3390/biology10090921](https://doi.org/10.3390/biology10090921)
