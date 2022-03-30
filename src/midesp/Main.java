@@ -26,6 +26,7 @@ public class Main {
 	
 	private static boolean isContinuous = false;
 	private static boolean isNoAPC = false;
+	private static boolean isPrintAll = false;
 	
 	private static double keepPercentage = 1;
 	
@@ -134,6 +135,18 @@ public class Main {
 			e.printStackTrace();
 			return false;
 		}
+		if(isPrintAll) {
+			try {
+				PrintWriter allSNPsPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".allSNPs")));
+				allSNPsPW.println("SNP Entropy MI");
+				snpList.forEach(snp -> allSNPsPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+				allSNPsPW.close();
+			} catch (IOException e) {
+				System.out.println("Error while writing SNPs to file");
+				e.printStackTrace();
+				return false;
+			}
+		}
 		if(isNoAPC) {
 			System.out.println("Calculating MI values for SNP pairs");
 			long possiblePairCount = (fileSigSNPList == null) ? calcPossiblePairsCount(sigSNPList.size(), snpList.size()) : calcPossiblePairsCount(fileSigSNPList.size(), snpList.size());
@@ -206,7 +219,7 @@ public class Main {
 			return true;
 		}
 		if(singleSNPMI_SigFinderResult.getZeroToLambda1Indices().size() < apcAverageNumber || singleSNPMI_SigFinderResult.getBackgroundIndices().size() < sigSNPList.size()) {
-			System.out.println("Not enough SNPs to calculate APC averages. Use a smaller value for -apc or deactive APC with -noapc.");
+			System.out.println("Not enough SNPs to calculate APC averages. Use a smaller value for -apc or deactivate APC with -noapc.");
 			System.out.println("Maximum possible value for current dataset is " + singleSNPMI_SigFinderResult.getZeroToLambda1Indices().size());
 			return false;
 		}
@@ -424,6 +437,9 @@ public class Main {
 			case "-noapc":
 				isNoAPC = true;
 				break;
+			case "-all":
+				isPrintAll = true;
+				break;
 			}	
 		}
 		tpedFile = Paths.get(args[args.length-2]);
@@ -452,6 +468,7 @@ public class Main {
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
 		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
 		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
+		System.out.println("-all\t\t\twrite an additional file containing the MI values for all SNPs (outputfile.allSNPs)");
 	}
 	
 }
