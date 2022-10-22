@@ -42,6 +42,7 @@ Optional parameters:
 -apc		number	set the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)
 -list		file	name of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value
 -noapc			indicate that the APC should not be applied
+-noepi			indicate that no epistatic SNP pairs should be calculated
 -all			write an additional file containing the MI values for all SNPs (outputfile.allSNPs)
 ```
 ## Examples

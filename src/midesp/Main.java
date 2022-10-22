@@ -26,6 +26,7 @@ public class Main {
 	
 	private static boolean isContinuous = false;
 	private static boolean isNoAPC = false;
+	private static boolean isNoEpi = false;
 	private static boolean isPrintAll = false;
 	
 	private static double keepPercentage = 1;
@@ -146,6 +147,10 @@ public class Main {
 				e.printStackTrace();
 				return false;
 			}
+		}
+		if(isNoEpi) {
+			System.out.println("Stopping without calculating epistatic SNP pairs");
+			return true;
 		}
 		if(isNoAPC) {
 			System.out.println("Calculating MI values for SNP pairs");
@@ -437,6 +442,9 @@ public class Main {
 			case "-noapc":
 				isNoAPC = true;
 				break;
+			case "-noepi":
+				isNoEpi = true;
+				break;				
 			case "-all":
 				isPrintAll = true;
 				break;
@@ -468,6 +476,7 @@ public class Main {
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
 		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
 		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
+		System.out.println("-noepi\t\t\tindicate that no epistatic SNP pairs should be calculated");
 		System.out.println("-all\t\t\twrite an additional file containing the MI values for all SNPs (outputfile.allSNPs)");
 	}
 	
