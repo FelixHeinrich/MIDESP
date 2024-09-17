@@ -116,6 +116,9 @@ public class Main {
 		System.out.println("Calculated single SNP association values");
 		System.out.println("Calculating pvalues for single SNP association");
 		SigFinderResult singleSNPMI_SigFinderResult = SignificanceFinder.findSignificantScores(singleSNPMI, fdr);
+		for(int i = 0; i < snpList.size(); i++) {
+			snpList.get(i).setPValue(singleSNPMI_SigFinderResult.getPValues().get(i));
+		}
 		System.out.println("Calculated pvalues for single SNP association");
 		List<SNP> sigSNPList = singleSNPMI_SigFinderResult.getSignificantIndices().parallelStream().map(idx -> snpList.get(idx)).collect(Collectors.toList());
 		System.out.println("Number of significantly associated single SNPs = " + sigSNPList.size());
@@ -123,12 +126,12 @@ public class Main {
 		PrintWriter sigSNPPW;
 		try {
 			sigSNPPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")));
-			sigSNPPW.println("SNP Entropy MI");
+			sigSNPPW.println("SNP Entropy MI PValue");
 			if(fileSigSNPList == null) {
-				sigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+				sigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
 			}
 			else {
-				fileSigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+				fileSigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
 			}
 			sigSNPPW.close();
 		} catch (IOException e) {
@@ -139,8 +142,8 @@ public class Main {
 		if(isPrintAll) {
 			try {
 				PrintWriter allSNPsPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".allSNPs")));
-				allSNPsPW.println("SNP Entropy MI");
-				snpList.forEach(snp -> allSNPsPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+				allSNPsPW.println("SNP Entropy MI PValue");
+				snpList.forEach(snp -> allSNPsPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
 				allSNPsPW.close();
 			} catch (IOException e) {
 				System.out.println("Error while writing SNPs to file");

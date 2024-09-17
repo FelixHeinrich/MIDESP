@@ -22,6 +22,7 @@ public class SNP {
 	private double entropyNats;
 	private double miToPheno;
 	private double averageMiToPheno;
+	private double pvalue;
 	
 	public SNP(String id, int length) {
 		this.id = id;
@@ -79,6 +80,14 @@ public class SNP {
 	
 	public void setAverageMItoPheno(double mi) {
 		averageMiToPheno = mi;
+	}
+	
+	public double getPValue() {
+		return pvalue;
+	}
+	
+	public void setPValue(double p) {
+		pvalue = p;
 	}
 	
 	public void parseValues(byte counter) {
