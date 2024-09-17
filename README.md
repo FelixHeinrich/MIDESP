@@ -21,7 +21,7 @@ Java 8 or later
 
 ## Getting Started
 
-1. Download MIDESP.jar from [Releases](https://github.com/FelixHeinrich/MIDESP/releases/tag/1.2) or compile it yourself from the source code
+1. Download MIDESP.jar from [Releases](https://github.com/FelixHeinrich/MIDESP/releases/tag/1.3) or compile it yourself from the source code
 2. Open a terminal and go to the directory where MIDESP.jar is located
 3. Run the following command with suitable parameters
 
