@@ -21,7 +21,7 @@ Java 8 or later
 
 ## Getting Started
 
-1. Download MIDESP.jar from [Releases](https://github.com/FelixHeinrich/MIDESP/releases/tag/1.3) or compile it yourself from the source code
+1. Download MIDESP.jar from [Releases](https://github.com/FelixHeinrich/MIDESP/releases/tag/1.4) or compile it yourself from the source code
 2. Open a terminal and go to the directory where MIDESP.jar is located
 3. Run the following command with suitable parameters
 
@@ -41,6 +41,7 @@ Optional parameters:
 -fdr		number	set the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)
 -apc		number	set the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)
 -list		file	name of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value
+-disccovariates	file	name of file that contains discrete covariate variables for the samples as tab-separated list
 -noapc			indicate that the APC should not be applied
 -noepi			indicate that no epistatic SNP pairs should be calculated
 -all			write an additional file containing the MI values for all SNPs (outputfile.allSNPs)

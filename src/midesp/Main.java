@@ -22,7 +22,7 @@ import midesp.methods.SignificanceFinder;
 
 public class Main {
 
-	private static Path tpedFile, tfamFile, outFile, snpListFile;
+	private static Path tpedFile, tfamFile, outFile, snpListFile, discCovariatesFile;
 	
 	private static boolean isContinuous = false;
 	private static boolean isNoAPC = false;
@@ -70,6 +70,9 @@ public class Main {
 		try {
 			snpList = SNP.readTPed(tpedFile);
 			pheno = Phenotype.readTFam(tfamFile, isContinuous);
+			if(discCovariatesFile != null) {
+				pheno.readDiscCovariateFile(discCovariatesFile);
+			}
 			if(snpListFile != null) {
 				fileSigSNPIDsList = Files.lines(snpListFile).collect(Collectors.toList());
 			}
@@ -116,6 +119,10 @@ public class Main {
 		System.out.println("Calculated single SNP association values");
 		System.out.println("Calculating pvalues for single SNP association");
 		SigFinderResult singleSNPMI_SigFinderResult = SignificanceFinder.findSignificantScores(singleSNPMI, fdr);
+		if(singleSNPMI_SigFinderResult == null) {
+			System.out.println("Could not calculate pvalues for single SNP association");
+			return false;
+		}
 		for(int i = 0; i < snpList.size(); i++) {
 			snpList.get(i).setPValue(singleSNPMI_SigFinderResult.getPValues().get(i));
 		}
@@ -442,6 +449,10 @@ public class Main {
 				snpListFile = Paths.get(args[i+1]);
 				i++;
 				break;
+			case "-disccovariates":
+				discCovariatesFile = Paths.get(args[i+1]);
+				i++;
+				break;
 			case "-noapc":
 				isNoAPC = true;
 				break;
@@ -478,6 +489,7 @@ public class Main {
 		System.out.println("-fdr\t\tnumber\tset the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)");
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
 		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
+		System.out.println("-disccovariates\tfile\tname of file that contains discrete covariate variables for the samples as tab-separated list");
 		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
 		System.out.println("-noepi\t\t\tindicate that no epistatic SNP pairs should be calculated");
 		System.out.println("-all\t\t\twrite an additional file containing the MI values for all SNPs (outputfile.allSNPs)");
