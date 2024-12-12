@@ -27,9 +27,13 @@ public class Phenotype{
 	private int[] discCovariate_bitValues;
 	private int[] discCovariate_bitCounts;
 	private int[] discPhenotype_discCovariate_bitValues;
+	private int[] discPhenotype_discCovariate_bitCounts;
 	private int[] bitValues;
+	private int[] bitCounts;
 	private int bitLength;
 	private int bitMax;
+	private int contCovariate_Count;
+	private int discCovariate_Count;
 	private int discCovariate_bitLength;
 	private int discCovariate_bitMax;
 	private int discPhenotype_discCovariate_bitLength;
@@ -40,7 +44,9 @@ public class Phenotype{
 	private double[] contPhenotypeVec;
 	private double[] digammaValuesArray;
 	private int[][] closestNeighborsMat;
+	private int[][] contCovariate_ClosestNeighborsMat;
 	private double[][] closestNeighborsDistMat;
+	private double[][] contCovariate_ClosestNeighborsDistMat;
 	
 	public Phenotype(String id, int length, boolean continuous) {
 		this.id = id;
@@ -72,6 +78,14 @@ public class Phenotype{
 		return hasContCovariate;
 	}
 	
+	public int getDiscCovariateCount() {
+		return discCovariate_Count;
+	}
+	
+	public int getContCovariateCount() {
+		return contCovariate_Count;
+	}
+	
 	public double[] getContPhenotype() {
 		return contPhenotypeVec;
 	}
@@ -96,12 +110,25 @@ public class Phenotype{
 		return bitValues;
 	}
 	
+	public int[] getDiscPhenotypeBitCounts() {
+		return bitCounts;
+	}
+	
 	public int[][] getClosestNeighborsMat(){
 		return closestNeighborsMat;
 	}
 	
 	public double[][] getClosestNeighborsDistMat(){
 		return closestNeighborsDistMat;
+	}
+	
+
+	public int[][] getContCovariate_ClosestNeighborsMat(){
+		return contCovariate_ClosestNeighborsMat;
+	}
+	
+	public double[][] getContCovariate_ClosestNeighborsDistMat(){
+		return contCovariate_ClosestNeighborsDistMat;
 	}
 	
 	public double[] getDigammaArray() {
@@ -141,6 +168,10 @@ public class Phenotype{
 
 	public int[] getDiscPhenotype_DiscCovariate_BitValues() {
 		return discPhenotype_discCovariate_bitValues;
+	}
+	
+	public int[] getDiscPhenotype_DiscCovariate_BitCounts() {
+		return discPhenotype_discCovariate_bitCounts;
 	}
 
 	public void setValueAt(int idx, String value) {
@@ -189,6 +220,10 @@ public class Phenotype{
 			bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
 			bitMax = counter-1;
 			discPhenotypeEntropyNats = MICalculator.calcEntropyInNats(bitValues,counter);
+			bitCounts = new int[counter];
+			for(int i = 0; i < length; i++) {
+				bitCounts[bitValues[i]]++;
+			}
 		}
 	}
 	
@@ -207,15 +242,16 @@ public class Phenotype{
 		if(covariateList.size() != this.length) {
 			throw new IOException("Number of values for covariate (" + covariateList.size() + ") is different from number of samples (" + this.length + ")");
 		}
-		int covariateCount = covariateList.get(0).length;
+		discCovariate_Count = covariateList.get(0).length;
+		System.out.println("Reading " + discCovariate_Count + " discrete covariate" + (discCovariate_Count > 1 ? "s" : ""));
 		for(int i = 1; i < covariateList.size(); i++) {
-			if(covariateCount != covariateList.get(i).length) {
-				throw new IOException("Number of covariates in line " + (i+1) +" (" + covariateList.get(i).length + ") is different from number of covariates in line 1 (" + covariateCount + ")");
+			if(discCovariate_Count != covariateList.get(i).length) {
+				throw new IOException("Number of covariates in line " + (i+1) +" (" + covariateList.get(i).length + ") is different from number of covariates in line 1 (" + discCovariate_Count + ")");
 			}
 		}
 		
-		int[][] covariateMat = new int[this.length][covariateCount];
-		for(int i = 0; i < covariateCount; i++) {
+		int[][] covariateMat = new int[this.length][discCovariate_Count];
+		for(int i = 0; i < discCovariate_Count; i++) {
 			Map<String, Integer> valueToNumber = new HashMap<>();
 			for(int j = 0; j < this.length; j++) {
 				String value = covariateList.get(j)[i];
@@ -259,8 +295,67 @@ public class Phenotype{
 			discPhenotype_discCovariate_bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
 			discPhenotype_discCovariate_bitMax = counter-1;
 			discPhenotype_discCovariate_JointEntropyNats = MICalculator.calcEntropyInNats(discPhenotype_discCovariate_bitValues, counter);
+			discPhenotype_discCovariate_bitCounts = new int[counter];
+			for(int i = 0; i < length; i++) {
+				discPhenotype_discCovariate_bitCounts[discPhenotype_discCovariate_bitValues[i]]++;
+			}
 		}
 		hasDiscCovariate = true;
+	}
+	
+	public void readContCovariateFile(Path covariateFile) throws IOException{
+		List<String[]> covariateList = Files.lines(covariateFile).map(str -> str.split("\t")).toList();
+		if(covariateList.size() != this.length) {
+			throw new IOException("Number of values for covariate (" + covariateList.size() + ") is different from number of samples (" + this.length + ")");
+		}
+		contCovariate_Count = covariateList.get(0).length;
+		if(contCovariate_Count != 1) {
+			throw new IOException("Only a single continuous covariate is supported. Please use the branch Experimental_Continuous_Covariates if more are necessary!");
+		}
+		if(isContinuous) {
+			throw new IOException("Continuous covariates are only supported for discrete phenotypes. Please use the branch Experimental_Continuous_Covariates if you have a continuous phenotype!");
+		}
+		System.out.println("Reading " + contCovariate_Count + " continuous covariate" + (contCovariate_Count > 1 ? "s" : ""));
+		for(int i = 1; i < covariateList.size(); i++) {
+			if(contCovariate_Count != covariateList.get(i).length) {
+				throw new IOException("Number of covariates in line " + (i+1) +" (" + covariateList.get(i).length + ") is different from number of covariates in line 1 (" + contCovariate_Count + ")");
+			}
+		}
+		double[][] contCovariateMat = covariateList.stream().map(arr -> Arrays.stream(arr).mapToDouble(Double::parseDouble).toArray()).toArray(double[][]::new);
+		if(contCovariateMat.length != length || contCovariateMat[0].length != contCovariate_Count) {
+			throw new IOException("Unexpected dimensions of continuous covariate matrix");
+		}
+		//Normalize covariates
+		for(int col = 0; col < contCovariate_Count; col++) {
+			int column = col;
+			double[] covariateVec = IntStream.range(0, length).mapToDouble(i -> contCovariateMat[i][column]).toArray();
+			covariateVec = MICalculator.minMaxNormalization(covariateVec);
+			for(int row = 0; row < length; row++) {
+				contCovariateMat[row][col] = covariateVec[row];
+			}
+		}
+		//Create sorted lists of neighbors for each entry
+		contCovariate_ClosestNeighborsMat = IntStream.range(0, length).mapToObj(index ->{
+			double currentValue = contCovariateMat[index][0];
+			List<Pair<Integer,Double>> pairList = new ArrayList<>();
+			for(int i = 0; i < length; i++) {
+				if(i != index) {
+					pairList.add(new Pair<>(i, Math.abs(currentValue - contCovariateMat[i][0])));
+				}
+			}
+			pairList.sort(Comparator.comparing(o -> o.getSecond()));
+			return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.getFirst()).boxed()).mapToInt(i->i).toArray();
+		}).toArray(int[][]::new);
+		//Calculate distances between the entry and its neighbors
+		contCovariate_ClosestNeighborsDistMat = IntStream.range(0, length).mapToObj(i ->{
+			return Arrays.stream(contCovariate_ClosestNeighborsMat[i]).mapToDouble(j ->{
+				return Math.abs(contCovariateMat[i][0] - contCovariateMat[j][0]);
+			}).toArray();
+		}).toArray(double[][]::new);
+		if(!isContinuous) {
+			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> MICalculator.calcDigamma(i)).toArray();
+		}
+		hasContCovariate = true;
 	}
 	
 	@Override
