@@ -70,7 +70,7 @@ public class MICalculator {
 	 * @param snps	as discrete X 
 	 * @return
 	 */
-	public static double calcMI_DiscPheno(Phenotype phenotype, SNP... snps) {
+	public static double calcMI_DiscPheno(Phenotype phenotype, int k, SNP... snps) {
 		int sampleCount;
 		int xBitLength, xBitMax;
 		int[] xVec;
@@ -174,7 +174,7 @@ public class MICalculator {
 		}
 		if(phenotype.hasDiscCovariate()) {
 			if(phenotype.hasContCovariate()) {
-				throw new UnsupportedOperationException("Continuous covariates are not yet supported");
+				nats = calcMI_DiscPheno_with_BothCovariates(phenotype, k, xVec, xCounts, xBitLength, xBitMax);
 			}
 			else {
 				nats = calcMI_DiscPheno_with_DiscCovariate(phenotype, xVec, xCounts, xBitLength, xBitMax);
@@ -182,7 +182,7 @@ public class MICalculator {
 		}
 		else {
 			if(phenotype.hasContCovariate()) {
-				throw new UnsupportedOperationException("Continuous covariates are not yet supported");
+				nats = calcMI_DiscPheno_with_ContCovariate(phenotype, k, xVec, xCounts, xBitLength, xBitMax);
 			}
 			else {
 				//y
@@ -315,6 +315,348 @@ public class MICalculator {
 		}
 		//H(X,V) + H(Y,V) - H(X,Y,V) - H(V)
 		return calcEntropyInNatsFromFreqs(xvCounts,sampleCount) + yvEntropy - calcEntropyInNatsFromFreqs(xyvCounts,sampleCount) - vEntropy;
+	}
+	
+	/**
+	 * Calculates MI(X;Y|W)
+	 * @param phenotype	as discrete Y
+	 * @param snps	as discrete X 
+	 * @param contCovariate as continuous W
+	 * @return
+	 */
+	public static double calcMI_DiscPheno_with_ContCovariate(Phenotype phenotype, int k, int[] xVec, int[] xCounts, int xBitLength, int xBitMax) {
+		int sampleCount;
+		int[] xyCounts;
+		int[] xyVec;
+		int yBitLength = phenotype.getDiscPhenotypeBitLength();
+		int yBitMax = phenotype.getDiscPhenotypeBitMax();
+		int[] yVec = phenotype.getDiscPhenotypeBitValues();
+		int[] yCounts = phenotype.getDiscPhenotypeBitCounts();
+		double yEntropy = phenotype.getDiscPhenotypeEntropyNats();
+		int[][] wClosestNeighbors = phenotype.getContCovariate_ClosestNeighborsMat();
+		double[][] wClosestNeighborsDist = phenotype.getContCovariate_ClosestNeighborsDistMat();
+		//Prepare variables
+		sampleCount = xVec.length;
+		double xEntropy = calcEntropyInNatsFromFreqs(xCounts, sampleCount);
+		//xy
+		int maxValue;
+		if(xBitLength > yBitLength) {
+			maxValue = xBitMax;
+			maxValue = maxValue << xBitLength;
+			maxValue += yBitMax;
+		}
+		else {
+			maxValue = yBitMax;
+			maxValue = maxValue << yBitLength;
+			maxValue += xBitMax;
+		}
+		xyCounts = new int[(int)maxValue+1];
+		xyVec = new int[sampleCount];
+		if(xBitLength > yBitLength) {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += xVec[i];
+				byteArray = byteArray << xBitLength;
+				byteArray += yVec[i];
+				xyCounts[byteArray]++;
+				xyVec[i] = byteArray;
+			}
+		}
+		else {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += yVec[i];
+				byteArray = byteArray << yBitLength;
+				byteArray += xVec[i];	
+				xyCounts[byteArray]++;
+				xyVec[i] = byteArray;
+			}
+		}
+		double xyEntropy = calcEntropyInNatsFromFreqs(xyCounts, sampleCount);
+		double[] digammaValues = phenotype.getDigammaArray();
+		double w_DigammaSum = 0;
+		double w_X_DigammaSum = 0;
+		double w_Y_DigammaSum = 0;
+		double w_XY_DigammaSum = 0;
+		double n_DigammaSum = 0;
+		double n_X_DigammaSum = 0;
+		double n_Y_DigammaSum = 0;
+		double n_XY_DigammaSum = 0;
+		
+		for(int i = 0; i < sampleCount; i++) {
+			int currentX = xVec[i];
+			int currentY = yVec[i];
+			int currentXY = xyVec[i];
+			int currentK = k;
+			if(xyCounts[currentXY] < k+1) {
+				if(xyCounts[currentXY] == 1) { //Case of no neighbour
+					//Correction according to the example code provided by Brian C. Ross	
+					//Slight adjustment to limit the number of classes for w_X and w_Y to the actual samples with classes currentX and currentY
+					int numClassesWithX = (int) IntStream.range(0, sampleCount).filter(idx -> xVec[idx] == currentX).map(idx -> xyVec[idx]).distinct().count();
+					int numClassesWithY = (int) IntStream.range(0, sampleCount).filter(idx -> yVec[idx] == currentY).map(idx -> xyVec[idx]).distinct().count();
+					int numClasses = (int) Arrays.stream(xyCounts).filter(xy -> xy != 0).count();
+					w_DigammaSum += digammaValues[numClasses * 2];
+					w_X_DigammaSum += digammaValues[numClassesWithX * 2 > xCounts[currentX] ? xCounts[currentX] : numClassesWithX * 2];
+					w_Y_DigammaSum += digammaValues[numClassesWithY * 2 > yCounts[currentY] ? yCounts[currentY] : numClassesWithY * 2];
+					w_XY_DigammaSum += digammaValues[1];
+					n_DigammaSum += digammaValues[sampleCount];
+					n_X_DigammaSum += digammaValues[xCounts[currentX]];
+					n_Y_DigammaSum += digammaValues[yCounts[currentY]];
+					n_XY_DigammaSum += digammaValues[1];
+					continue;					
+				}
+				else { // Case of less than k neighbours
+					currentK = xyCounts[currentXY]-1; //Set k to max. available neighbour
+				}
+			}
+			//Find distance to k-th neighbour for covariate
+			int nW_X = 0;
+			int nW_Y = 0;
+			int tmpCounter = 0;
+			int kthNeighbour_Covariate = 0;
+			for(int j = 1; j < sampleCount; j++) {
+				if(xVec[wClosestNeighbors[i][j]] == currentX) {
+					nW_X++;
+				}
+				if(yVec[wClosestNeighbors[i][j]] == currentY) {
+					nW_Y++;
+				}
+				if(xyVec[wClosestNeighbors[i][j]] == currentXY) {
+					tmpCounter++;
+					kthNeighbour_Covariate = j;
+					if(tmpCounter == currentK) {
+						break;
+					}
+				}
+			}
+
+			double epsilonDist = wClosestNeighborsDist[i][kthNeighbour_Covariate];
+			//Count samples closer than epsilon(i)
+			int nW = kthNeighbour_Covariate;
+			int nW_XY = tmpCounter;
+			for(int j = kthNeighbour_Covariate + 1; j < sampleCount; j++) {
+				if(wClosestNeighborsDist[i][j] <= epsilonDist) {
+					nW++;
+					if(xVec[wClosestNeighbors[i][j]] == currentX) {
+						nW_X++;
+					}
+					if(yVec[wClosestNeighbors[i][j]] == currentY) {
+						nW_Y++;
+					}
+					if(xyVec[wClosestNeighbors[i][j]] == currentXY) {
+						//For both considering X
+						nW_XY++;
+					}
+				}
+				else {
+					break;
+				}
+			}
+			w_DigammaSum += digammaValues[nW];
+			w_X_DigammaSum += digammaValues[nW_X];
+			w_Y_DigammaSum += digammaValues[nW_Y];
+			w_XY_DigammaSum += digammaValues[nW_XY];
+			n_DigammaSum += digammaValues[sampleCount];
+			n_X_DigammaSum += digammaValues[xCounts[currentX]];
+			n_Y_DigammaSum += digammaValues[yCounts[currentY]];
+			n_XY_DigammaSum += digammaValues[xyCounts[currentXY]];
+		}
+		return (w_DigammaSum / sampleCount) - (n_DigammaSum / sampleCount) + (w_XY_DigammaSum / sampleCount) - (n_XY_DigammaSum / sampleCount) - (w_Y_DigammaSum / sampleCount) + (n_Y_DigammaSum / sampleCount) - (w_X_DigammaSum / sampleCount) + (n_X_DigammaSum / sampleCount) + xEntropy + yEntropy - xyEntropy; 
+	}
+	
+	/**
+	 * Calculates MI(X;Y|V,W)
+	 * @param phenotype	as discrete Y
+	 * @param snps	as discrete X 
+	 * @param discCovariate as discrete V
+	 * @param contCovariate as continuous W
+	 * @return
+	 */
+	public static double calcMI_DiscPheno_with_BothCovariates(Phenotype phenotype, int k, int[] xVec, int[] xCounts, int xBitLength, int xBitMax) {
+		int sampleCount;
+		int[] xvCounts;
+		int[] xvVec;
+		int[] xyvCounts;
+		int[] xyvVec;
+		int vBitLength = phenotype.getDiscCovariateBitLength();
+		int vBitMax = phenotype.getDiscCovariateBitMax();
+		int[] vVec = phenotype.getDiscCovariateBitValues();
+		int[] vCounts = phenotype.getDiscCovariateBitCounts();
+		int yvBitLength = phenotype.getDiscPhenotype_DiscCovariate_BitLength();
+		int yvBitMax = phenotype.getDiscPhenotype_DiscCovariate_BitMax();
+		int[] yvVec = phenotype.getDiscPhenotype_DiscCovariate_BitValues();
+		int[] yvCounts = phenotype.getDiscPhenotype_DiscCovariate_BitCounts();
+		double vEntropy = phenotype.getDiscCovariateEntropyNats();
+		double yvEntropy = phenotype.getDiscPhenotype_DiscCovariateJointEntropyNats();
+		int[][] wClosestNeighbors = phenotype.getContCovariate_ClosestNeighborsMat();
+		double[][] wClosestNeighborsDist = phenotype.getContCovariate_ClosestNeighborsDistMat();
+		//Prepare variables
+		sampleCount = xVec.length;
+		//xv
+		int maxValue;
+		if(xBitLength > vBitLength) {
+			maxValue = xBitMax;
+			maxValue = maxValue << xBitLength;
+			maxValue += vBitMax;
+		}
+		else {
+			maxValue = vBitMax;
+			maxValue = maxValue << vBitLength;
+			maxValue += xBitMax;
+		}
+		xvCounts = new int[(int)maxValue+1];
+		xvVec = new int[sampleCount];
+		if(xBitLength > vBitLength) {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += xVec[i];
+				byteArray = byteArray << xBitLength;
+				byteArray += vVec[i];
+				xvCounts[byteArray]++;
+				xvVec[i] = byteArray;
+			}
+		}
+		else {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += vVec[i];
+				byteArray = byteArray << vBitLength;
+				byteArray += xVec[i];	
+				xvCounts[byteArray]++;
+				xvVec[i] = byteArray;
+			}
+		}
+		double xvEntropy = calcEntropyInNatsFromFreqs(xvCounts, sampleCount);
+		//xyv
+		if(xBitLength > yvBitLength) {
+			maxValue = xBitMax;
+			maxValue = maxValue << xBitLength;
+			maxValue += yvBitMax;
+		}
+		else {
+			maxValue = yvBitMax;
+			maxValue = maxValue << yvBitLength;
+			maxValue += xBitMax;
+		}
+		xyvCounts = new int[(int)maxValue+1];
+		xyvVec = new int[sampleCount];
+		if(xBitLength > yvBitLength) {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += xVec[i];
+				byteArray = byteArray << xBitLength;
+				byteArray += yvVec[i];
+				xyvCounts[byteArray]++;
+				xyvVec[i] = byteArray;
+			}
+		}
+		else {
+			for(int i = 0; i < sampleCount; i++) {
+				int byteArray = 0;
+				byteArray += yvVec[i];
+				byteArray = byteArray << yvBitLength;
+				byteArray += xVec[i];	
+				xyvCounts[byteArray]++;
+				xyvVec[i] = byteArray;
+			}
+		}
+		double xyvEntropy = calcEntropyInNatsFromFreqs(xyvCounts, sampleCount);
+
+		double[] digammaValues = phenotype.getDigammaArray();
+		double w_YV_DigammaSum = 0;
+		double w_XYV_DigammaSum = 0;
+		double w_V_DigammaSum = 0;
+		double w_XV_DigammaSum = 0;
+		double n_YV_DigammaSum = 0;
+		double n_XYV_DigammaSum = 0;
+		double n_V_DigammaSum = 0;
+		double n_XV_DigammaSum = 0;
+		
+		for(int i = 0; i < sampleCount; i++) {
+			int currentV = vVec[i];
+			int currentXV = xvVec[i];
+			int currentYV = yvVec[i];
+			int currentXYV = xyvVec[i];
+			int currentK = k;
+			if(xyvCounts[currentXYV] < k+1) {
+				if(xyvCounts[currentXYV] == 1) { //Case of no neighbour
+					//Correction according to the example code provided by Brian C. Ross	
+					//Slight adjustment to limit the number of classes for w_V, w_YV and w_XV to the actual samples with classes currentV, currentYV and currentXV
+					int numClassesWithV = (int) IntStream.range(0, sampleCount).filter(idx -> vVec[idx] == currentV).map(idx -> xyvVec[idx]).distinct().count();
+					int numClassesWithYV = (int) IntStream.range(0, sampleCount).filter(idx -> yvVec[idx] == currentYV).map(idx -> xyvVec[idx]).distinct().count();
+					int numClassesWithXV = (int) IntStream.range(0, sampleCount).filter(idx -> xvVec[idx] == currentXV).map(idx -> xyvVec[idx]).distinct().count();
+					w_V_DigammaSum += digammaValues[numClassesWithV * 2 > vCounts[currentV] ? vCounts[currentV] : numClassesWithV * 2];
+					w_XV_DigammaSum += digammaValues[numClassesWithXV * 2 > xvCounts[currentXV] ? xvCounts[currentXV] : numClassesWithXV * 2];
+					w_YV_DigammaSum += digammaValues[numClassesWithYV * 2 > yvCounts[currentYV] ? yvCounts[currentYV] : numClassesWithYV * 2];
+					w_XYV_DigammaSum += digammaValues[1];
+					n_V_DigammaSum += digammaValues[vCounts[currentV]];
+					n_XV_DigammaSum += digammaValues[xvCounts[currentXV]];
+					n_YV_DigammaSum += digammaValues[yvCounts[currentYV]];
+					n_XYV_DigammaSum += digammaValues[1];
+					continue;					
+				}
+				else { // Case of less than k neighbours
+					currentK = xyvCounts[currentXYV]-1; //Set k to max. available neighbour
+				}
+			}
+			//Find distance to k-th neighbour for covariate
+			int nW_V = 0;
+			int nW_XV = 0;
+			int nW_YV = 0;
+			int tmpCounter = 0;
+			int kthNeighbour_Covariate = 0;
+			for(int j = 1; j < sampleCount; j++) {
+				if(vVec[wClosestNeighbors[i][j]] == currentV) {
+					nW_V++;
+				}
+				if(xvVec[wClosestNeighbors[i][j]] == currentXV) {
+					nW_XV++;
+				}
+				if(yvVec[wClosestNeighbors[i][j]] == currentYV) {
+					nW_YV++;
+				}
+				if(xyvVec[wClosestNeighbors[i][j]] == currentXYV) {
+					tmpCounter++;
+					kthNeighbour_Covariate = j;
+					if(tmpCounter == currentK) {
+						break;
+					}
+				}
+			}
+
+			double epsilonDist = wClosestNeighborsDist[i][kthNeighbour_Covariate];
+			//Count samples closer than epsilon(i)
+			int nW_XYV = tmpCounter;
+			for(int j = kthNeighbour_Covariate + 1; j < sampleCount; j++) {
+				if(wClosestNeighborsDist[i][j] <= epsilonDist) {
+					if(vVec[wClosestNeighbors[i][j]] == currentV) {
+						nW_V++;
+					}
+					if(xvVec[wClosestNeighbors[i][j]] == currentXV) {
+						nW_XV++;
+					}
+					if(yvVec[wClosestNeighbors[i][j]] == currentYV) {
+						nW_YV++;
+					}
+					if(xyvVec[wClosestNeighbors[i][j]] == currentXYV) {
+						nW_XYV++;
+					}
+				}
+				else {
+					break;
+				}
+			}
+			w_V_DigammaSum += digammaValues[nW_V];
+			w_XV_DigammaSum += digammaValues[nW_XV];
+			w_YV_DigammaSum += digammaValues[nW_YV];
+			w_XYV_DigammaSum += digammaValues[nW_XYV];
+			n_V_DigammaSum += digammaValues[vCounts[currentV]];
+			n_XV_DigammaSum += digammaValues[xvCounts[currentXV]];
+			n_YV_DigammaSum += digammaValues[yvCounts[currentYV]];
+			n_XYV_DigammaSum += digammaValues[xyvCounts[currentXYV]];
+		}
+		
+		return - (w_YV_DigammaSum / sampleCount) + (n_YV_DigammaSum / sampleCount) + (w_XYV_DigammaSum / sampleCount) - (n_XYV_DigammaSum / sampleCount) + (w_V_DigammaSum / sampleCount) - (n_V_DigammaSum / sampleCount) - (w_XV_DigammaSum / sampleCount) + (n_XV_DigammaSum / sampleCount) + xvEntropy + yvEntropy - xyvEntropy - vEntropy; 
 	}
 	
 	/**

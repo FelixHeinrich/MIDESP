@@ -22,7 +22,7 @@ import midesp.methods.SignificanceFinder;
 
 public class Main {
 
-	private static Path tpedFile, tfamFile, outFile, snpListFile, discCovariatesFile;
+	private static Path tpedFile, tfamFile, outFile, snpListFile, discCovariatesFile, contCovariatesFile;
 	
 	private static boolean isContinuous = false;
 	private static boolean isNoAPC = false;
@@ -73,6 +73,9 @@ public class Main {
 			if(discCovariatesFile != null) {
 				pheno.readDiscCovariateFile(discCovariatesFile);
 			}
+			if(contCovariatesFile != null) {
+				pheno.readContCovariateFile(contCovariatesFile);
+			}
 			if(snpListFile != null) {
 				fileSigSNPIDsList = Files.lines(snpListFile).collect(Collectors.toList());
 			}
@@ -110,13 +113,25 @@ public class Main {
 				mi = MICalculator.calcMI_ContPheno(pheno, kNext, snp);
 			}
 			else {
-				mi = MICalculator.calcMI_DiscPheno(pheno, snp);
+				mi = MICalculator.calcMI_DiscPheno(pheno, kNext, snp);
 			}
 			snp.setMItoPheno(mi);
 			return mi;
 		}).collect(Collectors.toList());
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Calculated single SNP association values");
+		/**TEMP_TO_DELETE**/
+		try {
+			PrintWriter testPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")));
+			testPW.println("SNP Entropy MI");
+			snpList.forEach(snp -> testPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
+			testPW.close();
+		} catch (IOException e) {
+			System.out.println("Error while writing SNPs to file");
+			e.printStackTrace();
+			return false;
+		}
+		/**TEMP_TO_DELETE**/
 		System.out.println("Calculating pvalues for single SNP association");
 		SigFinderResult singleSNPMI_SigFinderResult = SignificanceFinder.findSignificantScores(singleSNPMI, fdr);
 		if(singleSNPMI_SigFinderResult == null) {
@@ -188,7 +203,7 @@ public class Main {
 							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
 						}
 						else {
-							mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+							mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
 						}
 						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
 					}).collect(Collectors.toList());
@@ -207,7 +222,7 @@ public class Main {
 							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
 						}
 						else {
-							mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+							mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
 						}
 						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
 					}).collect(Collectors.toList());
@@ -249,7 +264,7 @@ public class Main {
 					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			snp.setAverageMItoPheno(sum / apcAverageNumber);
@@ -270,7 +285,7 @@ public class Main {
 					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			return sum / apcAverageNumber;
@@ -291,7 +306,7 @@ public class Main {
 					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			return sum / apcAverageNumber;
@@ -313,7 +328,7 @@ public class Main {
 						sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 					}
 					else {
-						sum += MICalculator.calcMI_DiscPheno(pheno, snp, snpList.get(randIndices.get(i)));
+						sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
 					}
 				}
 				snp.setAverageMItoPheno(sum / apcAverageNumber);
@@ -346,7 +361,7 @@ public class Main {
 						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
 					}
 					else {
-						mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+						mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
 					}
 					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
 					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
@@ -366,7 +381,7 @@ public class Main {
 						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
 					}
 					else {
-						mi = MICalculator.calcMI_DiscPheno(pheno, firstSNP, secondSNP);
+						mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
 					}
 					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
 					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
@@ -453,6 +468,10 @@ public class Main {
 				discCovariatesFile = Paths.get(args[i+1]);
 				i++;
 				break;
+			case "-contcovariates":
+				contCovariatesFile = Paths.get(args[i+1]);
+				i++;
+				break;
 			case "-noapc":
 				isNoAPC = true;
 				break;
@@ -490,6 +509,7 @@ public class Main {
 		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
 		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
 		System.out.println("-disccovariates\tfile\tname of file that contains discrete covariate variables for the samples as tab-separated list");
+		System.out.println("-contcovariates\tfile\tname of file that contains continuous covariate variables for the samples as tab-separated list");
 		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
 		System.out.println("-noepi\t\t\tindicate that no epistatic SNP pairs should be calculated");
 		System.out.println("-all\t\t\twrite an additional file containing the MI values for all SNPs (outputfile.allSNPs)");
