@@ -6,6 +6,9 @@ MIDESP calculates the mutual information between SNP pairs and phenotypes and re
 
 Genotype and phenotype data needs to be in the `tped` and `tfam` format used by [PLINK](https://www.cog-genomics.org/plink/1.9/formats).
 
+> [!WARNING]
+> MIDESP does not support missing genotype or phenotype values. Any missing values present in the input data will be treated as an additional genotype or phenotype category rather than as missing data, which may lead to incorrect mutual information values.
+
 The program by default will create two files:
 
 - `outputfile.sigSNPs` which contains a list of the SNPs that were found as being strongly associated to the phenotype along with their entropy and the mutual information between the SNP and the phenotype
