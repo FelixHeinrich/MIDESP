@@ -194,8 +194,8 @@ public class Phenotype{
 						pairList.add(new Pair<>(i, Math.abs(currentValue - contPhenotypeVec[i])));
 					}
 				}
-				pairList.sort(Comparator.comparing(o -> o.getSecond()));
-				return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.getFirst()).boxed()).mapToInt(i->i).toArray();
+				pairList.sort(Comparator.comparing(o -> o.second()));
+				return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.first()).boxed()).mapToInt(i->i).toArray();
 			}).toArray(int[][]::new);
 			//Calculate distances between the entry and its neighbors
 			closestNeighborsDistMat = IntStream.range(0, length).mapToObj(i ->{
@@ -343,8 +343,8 @@ public class Phenotype{
 					pairList.add(new Pair<>(i, Math.abs(currentValue - contCovariateMat[i][0])));
 				}
 			}
-			pairList.sort(Comparator.comparing(o -> o.getSecond()));
-			return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.getFirst()).boxed()).mapToInt(i->i).toArray();
+			pairList.sort(Comparator.comparing(o -> o.second()));
+			return Stream.concat(Stream.of(index), pairList.stream().mapToInt(pair -> pair.first()).boxed()).mapToInt(i->i).toArray();
 		}).toArray(int[][]::new);
 		//Calculate distances between the entry and its neighbors
 		contCovariate_ClosestNeighborsDistMat = IntStream.range(0, length).mapToObj(i ->{

@@ -20,26 +20,26 @@ public class SignificanceFinder {
         List<Double> pValuesList = calcPValues(valuesList, alpha, beta);
         if(performChiSquareTest(pValuesList)) {
         	Pair<Pair<Double,Double>,Double> gammaValues = getGamma(pValuesList);
-        	Pair<Double,Double> boundaries = gammaValues.getFirst();
-        	double gamma = gammaValues.getSecond();
-        	double tau = getTau(pValuesList, fdr, boundaries.getFirst(), gamma);
+        	Pair<Double,Double> boundaries = gammaValues.first();
+        	double gamma = gammaValues.second();
+        	double tau = getTau(pValuesList, fdr, boundaries.first(), gamma);
         	if(tau <= 0) {
         		Pair<List<Double>,Pair<Double,Pair<Double,Double>>> result = varianceDecrease(mean, variance, fdr, valuesList);
-        		pValuesList = result.getFirst();
-        		tau = result.getSecond().getFirst();
-        		boundaries = result.getSecond().getSecond();
+        		pValuesList = result.first();
+        		tau = result.second().first();
+        		boundaries = result.second().second();
         	}
         	else {
         		Pair<List<Double>,Pair<Double,Pair<Double,Double>>> result = varianceIncrease(mean, variance, fdr, valuesList, boundaries);
-        		pValuesList = result.getFirst();
-        		tau = result.getSecond().getFirst();
-        		boundaries = result.getSecond().getSecond();
+        		pValuesList = result.first();
+        		tau = result.second().first();
+        		boundaries = result.second().second();
         	}
         	if(tau < 0) {
         		System.out.println("Failed to compute lambda_1 and lambda_2 with sufficient distance between each other.");
         		return null;
         	}
-        	return new SigFinderResult(pValuesList, boundaries.getFirst(), boundaries.getSecond(), tau);
+        	return new SigFinderResult(pValuesList, boundaries.first(), boundaries.second(), tau);
         }
         else {
         	System.out.println("ChiSquareTest reported a uniform distribution of pvalues");
@@ -71,11 +71,11 @@ public class SignificanceFinder {
 	
 	private static Pair<Pair<Double,Double>,Double> getGamma(List<Double> valuesList) {
 		Pair<Double,Double> boundaries = estBoundaries(valuesList);
-		if(boundaries.getSecond() - boundaries.getFirst() < 0.18) {
+		if(boundaries.second() - boundaries.first() < 0.18) {
 			return null;
 		}
-		long counter = valuesList.parallelStream().filter(value -> value >= boundaries.getFirst() && value <= boundaries.getSecond()).count();
-		double gamma = counter / (valuesList.size() * (boundaries.getSecond() - boundaries.getFirst()));
+		long counter = valuesList.parallelStream().filter(value -> value >= boundaries.first() && value <= boundaries.second()).count();
+		double gamma = counter / (valuesList.size() * (boundaries.second() - boundaries.first()));
 		return new Pair<>(boundaries, gamma);
 	}
 	
@@ -161,9 +161,9 @@ public class SignificanceFinder {
 			List<Double> pValuesList = calcPValues(valuesList, alpha, beta);
 			if(performChiSquareTest(pValuesList)) {
 				Pair<Pair<Double,Double>,Double> gammaValues = getGamma(pValuesList);
-	        	Pair<Double,Double> boundaries = gammaValues.getFirst();
-	        	double gamma = gammaValues.getSecond();
-	        	double tau = getTau(pValuesList, fdr, boundaries.getFirst(), gamma);
+	        	Pair<Double,Double> boundaries = gammaValues.first();
+	        	double gamma = gammaValues.second();
+	        	double tau = getTau(pValuesList, fdr, boundaries.first(), gamma);
 	        	if(tau > 0) {
 	        		return new Pair<>(pValuesList,new Pair<>(tau, boundaries));
 	        	}
@@ -187,26 +187,26 @@ public class SignificanceFinder {
 			List<Double> pValuesList = calcPValues(valuesList, alpha, beta);
 			if(performChiSquareTest(pValuesList)) {
 				Pair<Pair<Double,Double>,Double> gammaValues = getGamma(pValuesList);
-	        	Pair<Double,Double> boundaries = gammaValues.getFirst();
-	        	double gamma = gammaValues.getSecond();
+	        	Pair<Double,Double> boundaries = gammaValues.first();
+	        	double gamma = gammaValues.second();
 	        	if(!checkGamma(boundaries, boundariesOrg)) {
 	        		variance -= variance * 0.01;
 	        		alpha = estAlpha(mean, variance);
 	        		beta = estBeta(mean, variance);
 	        		pValuesList = calcPValues(valuesList, alpha, beta);
 	        		gammaValues = getGamma(pValuesList);
-	        		boundaries = gammaValues.getFirst();
-		        	gamma = gammaValues.getSecond();
-	        		tau = getTau(pValuesList, fdr, boundaries.getFirst(), gamma);
+	        		boundaries = gammaValues.first();
+		        	gamma = gammaValues.second();
+	        		tau = getTau(pValuesList, fdr, boundaries.first(), gamma);
 	        	}
-	        	tau = getTau(pValuesList, fdr, boundaries.getFirst(), gamma);
+	        	tau = getTau(pValuesList, fdr, boundaries.first(), gamma);
 	        	if(tau <= 0) {
 	        		return new Pair<>(pValuesList,new Pair<>(lastTau, boundaries));
 	        	}
 			}
 			if(!alphaCheck) {
         	    Pair<Pair<Double,Double>,Double> gammaValues = getGamma(pValuesList);
-        	    Pair<Double,Double> boundaries = gammaValues.getFirst();
+        	    Pair<Double,Double> boundaries = gammaValues.first();
 				return new Pair<>(pValuesList,new Pair<>(tau, boundaries));
 			}
 			lastTau = tau;
@@ -215,7 +215,7 @@ public class SignificanceFinder {
 	
 	private static boolean checkGamma(Pair<Double,Double> boundariesOrg, Pair<Double,Double> boundariesNew) {
 		double epsilon = 0.05;
-		if(Math.abs(boundariesOrg.getFirst() - boundariesNew.getFirst()) < epsilon && Math.abs(boundariesOrg.getSecond() - boundariesNew.getSecond()) < epsilon) {
+		if(Math.abs(boundariesOrg.first() - boundariesNew.first()) < epsilon && Math.abs(boundariesOrg.second() - boundariesNew.second()) < epsilon) {
 			return true;
 		}			
 		return false;
