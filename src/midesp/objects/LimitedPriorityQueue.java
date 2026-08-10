@@ -1,6 +1,7 @@
 package midesp.objects;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.PriorityQueue;
 
 public class LimitedPriorityQueue<E extends Comparable<E>> extends PriorityQueue<E> {
@@ -10,7 +11,10 @@ public class LimitedPriorityQueue<E extends Comparable<E>> extends PriorityQueue
 	private final int limit;
 	
 	public LimitedPriorityQueue(int limit) {
-		super();
+		super(Math.max(1, limit));
+		if(limit <= 0) {
+			throw new IllegalArgumentException("Limit must be greater than 0");
+		}
 		this.limit = limit;
 	}
 	
@@ -19,24 +23,35 @@ public class LimitedPriorityQueue<E extends Comparable<E>> extends PriorityQueue
 	}
 	
 	@Override
-	public boolean add(E element) {
-		if(this.size() == limit) {
-			E head = this.peek();
+	public boolean offer(E element) {
+		Objects.requireNonNull(element, "Null elements are not permitted");
+		
+		if(size() >= limit) {
+			E head = peek();
 			if(head.compareTo(element) < 0) {
-				this.remove();
+				poll();
 			}
 			else {
 				return false;
 			}
 		}
-		return super.add(element);
+		
+		return super.offer(element);
+	}
+	
+	@Override
+	public boolean add(E element) {
+		return offer(element);
 	}
 	
 	@Override
 	public boolean addAll(Collection<? extends E> col) {
+		boolean modified = false;
 		for(E element : col) {
-			this.add(element);
+			if(offer(element)) {
+				modified = true;
+			}
 		}
-		return true;
+		return modified;
 	}
 }
