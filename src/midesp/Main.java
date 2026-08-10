@@ -408,13 +408,9 @@ public class Main {
 		}
 		return true;
 	}
-
-	private static long calcPossiblePairsCount(int sigSNPCount, int totalSNPCount) {
-		long pairCounter = 0;
-		for(int i = 1; i <= sigSNPCount; i++) {
-			pairCounter += totalSNPCount - (i-1);
-		}
-		return pairCounter;
+	
+	private static long calcPossiblePairsCount(long sigSNPCount, long totalSNPCount) {
+		return totalSNPCount * sigSNPCount - (sigSNPCount * (sigSNPCount - 1)) / 2;
 	}
 	
 	private static void parseArgs(String[] args) throws IllegalArgumentException{
