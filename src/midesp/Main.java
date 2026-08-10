@@ -121,11 +121,9 @@ public class Main {
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Calculated single SNP association values");
 		/**TEMP_TO_DELETE**/
-		try {
-			PrintWriter testPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")));
+		try(PrintWriter testPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")))) {
 			testPW.println("SNP Entropy MI");
 			snpList.forEach(snp -> testPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno()));
-			testPW.close();
 		} catch (IOException e) {
 			System.out.println("Error while writing SNPs to file");
 			e.printStackTrace();
@@ -145,9 +143,7 @@ public class Main {
 		List<SNP> sigSNPList = singleSNPMI_SigFinderResult.getSignificantIndices().parallelStream().map(idx -> snpList.get(idx)).collect(Collectors.toList());
 		System.out.println("Number of significantly associated single SNPs = " + sigSNPList.size());
 		System.out.println("Writing significantly associated single SNPs to file");
-		PrintWriter sigSNPPW;
-		try {
-			sigSNPPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")));
+		try(PrintWriter sigSNPPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")))) {
 			sigSNPPW.println("SNP Entropy MI PValue");
 			if(fileSigSNPList == null) {
 				sigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
@@ -155,18 +151,15 @@ public class Main {
 			else {
 				fileSigSNPList.forEach(snp -> sigSNPPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
 			}
-			sigSNPPW.close();
 		} catch (IOException e) {
 			System.out.println("Error while writing SNPs to file");
 			e.printStackTrace();
 			return false;
 		}
 		if(isPrintAll) {
-			try {
-				PrintWriter allSNPsPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".allSNPs")));
+			try(PrintWriter allSNPsPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".allSNPs")))) {
 				allSNPsPW.println("SNP Entropy MI PValue");
 				snpList.forEach(snp -> allSNPsPW.println(snp.getID() + " " + snp.getEntropyLog2() + " " + snp.getMItoPheno() + " " + snp.getPValue()));
-				allSNPsPW.close();
 			} catch (IOException e) {
 				System.out.println("Error while writing SNPs to file");
 				e.printStackTrace();
@@ -231,15 +224,13 @@ public class Main {
 			}
 			System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 			System.out.println("Writing results to file");
-			PrintWriter outPW;
-			try {
-				outPW = new PrintWriter(Files.newBufferedWriter(outFile));
+			
+			try(PrintWriter outPW = new PrintWriter(Files.newBufferedWriter(outFile))) {
 				outPW.println("SNP1 + SNP2 MI");
 				while(!topResults.isEmpty()) {
 					MIResult result = topResults.poll();
 					outPW.println(result.toNoAPCString());
 				}
-				outPW.close();
 			}
 			catch(IOException e) {
 				System.out.println("Error while writing results to file");
@@ -391,15 +382,12 @@ public class Main {
 		}
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Writing results to file");
-		PrintWriter outPW;
-		try {
-			outPW = new PrintWriter(Files.newBufferedWriter(outFile));
+		try(PrintWriter outPW = new PrintWriter(Files.newBufferedWriter(outFile))) {
 			outPW.println("SNP1 + SNP2 MI MI_APC");
 			while(!topResults.isEmpty()) {
 				MIResult result = topResults.poll();
-				outPW.println(result);
+				outPW.println(result.toNoAPCString());
 			}
-			outPW.close();
 		}
 		catch(IOException e) {
 			System.out.println("Error while writing results to file");
