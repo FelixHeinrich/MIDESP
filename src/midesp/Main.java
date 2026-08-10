@@ -7,7 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -172,55 +174,31 @@ public class Main {
 		}
 		if(isNoAPC) {
 			System.out.println("Calculating MI values for SNP pairs");
-			long possiblePairCount = (fileSigSNPList == null) ? calcPossiblePairsCount(sigSNPList.size(), snpList.size()) : calcPossiblePairsCount(fileSigSNPList.size(), snpList.size());
+			List<SNP> effectiveSigSNPList = (fileSigSNPList != null) ? fileSigSNPList : sigSNPList; 
+			long possiblePairCount = calcPossiblePairsCount(effectiveSigSNPList.size(), snpList.size());
 			int savePairCount = (int) (possiblePairCount * (keepPercentage / 100.0));
 			System.out.println("Saving top " + savePairCount + " pairs (" + keepPercentage + "% from " + possiblePairCount + " calculated pairs)");
 			LimitedPriorityQueue<MIResult> topResults = new LimitedPriorityQueue<>(savePairCount);
-			List<SNP> tmpList = fileSigSNPList;
-			List<SNP> snpWithoutSigList = (fileSigSNPList == null) ? snpList.stream().filter(snp -> !sigSNPList.contains(snp)).collect(Collectors.toList()) : snpList.stream().filter(snp -> !tmpList.contains(snp)).collect(Collectors.toList());
-			List<SNP> targetSNPList = (fileSigSNPList == null) ? Stream.concat(sigSNPList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList()) : Stream.concat(tmpList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList());
+			Set<SNP> sigSNPSet = new HashSet<>(effectiveSigSNPList);
+			List<SNP> snpWithoutSigList = snpList.stream().filter(snp -> !sigSNPSet.contains(snp)).toList();
+			List<SNP> targetSNPList = Stream.concat(effectiveSigSNPList.stream(), snpWithoutSigList.stream()).toList();
 			if(targetSNPList.size() != snpList.size()) {
 				System.out.println("List sizes are not equal");
 				return false;
 			}
 			start = System.nanoTime();
-			if(fileSigSNPList == null) {
-				for(int i = 0; i < sigSNPList.size(); i++) {
-					if(i % 10 == 0) {
-						System.out.println("Iteration " + i);
-					}
-					SNP firstSNP = sigSNPList.get(i);
-					List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
-						double mi;
-						if(isContinuous) {
-							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
-						}
-						else {
-							mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
-						}
-						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
-					}).collect(Collectors.toList());
-					topResults.addAll(tempResults);
+			for(int i = 0; i < effectiveSigSNPList.size(); i++) {
+				if(i % 10 == 0) {
+					System.out.println("Iteration " + i);
 				}
-			}
-			else {
-				for(int i = 0; i < fileSigSNPList.size(); i++) {
-					if(i % 10 == 0) {
-						System.out.println("Iteration " + i);
-					}
-					SNP firstSNP = fileSigSNPList.get(i);
-					List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
-						double mi;
-						if(isContinuous) {
-							mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
-						}
-						else {
-							mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
-						}
-						return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
-					}).collect(Collectors.toList());
-					topResults.addAll(tempResults);
-				}
+				SNP firstSNP = effectiveSigSNPList.get(i);
+				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+					double mi = isContinuous
+							? MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP)
+							: MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
+					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
+				}).toList();
+				topResults.addAll(tempResults);
 			}
 			System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 			System.out.println("Writing results to file");
@@ -328,60 +306,36 @@ public class Main {
 			System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		}
 		System.out.println("Calculating MI values for SNP pairs");
-		long possiblePairCount = (fileSigSNPList == null) ? calcPossiblePairsCount(sigSNPList.size(), snpList.size()) : calcPossiblePairsCount(fileSigSNPList.size(), snpList.size());
+		List<SNP> effectiveSigSNPList = (fileSigSNPList != null) ? fileSigSNPList : sigSNPList; 
+		long possiblePairCount = calcPossiblePairsCount(effectiveSigSNPList.size(), snpList.size());
 		int savePairCount = (int) (possiblePairCount * (keepPercentage / 100.0));
 		System.out.println("Saving top " + savePairCount + " pairs (" + keepPercentage + "% from " + possiblePairCount + " calculated pairs)");
 		LimitedPriorityQueue<MIResult> topResults = new LimitedPriorityQueue<>(savePairCount);
-		List<SNP> tmpList = fileSigSNPList;
-		List<SNP> snpWithoutSigList = (fileSigSNPList == null) ? snpList.stream().filter(snp -> !sigSNPList.contains(snp)).collect(Collectors.toList()) : snpList.stream().filter(snp -> !tmpList.contains(snp)).collect(Collectors.toList());
-		List<SNP> targetSNPList = (fileSigSNPList == null) ? Stream.concat(sigSNPList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList()) : Stream.concat(tmpList.stream(), snpWithoutSigList.stream()).collect(Collectors.toList());
+		Set<SNP> sigSNPSet = new HashSet<>(effectiveSigSNPList);
+		List<SNP> snpWithoutSigList = snpList.stream().filter(snp -> !sigSNPSet.contains(snp)).toList();
+		List<SNP> targetSNPList = Stream.concat(effectiveSigSNPList.stream(), snpWithoutSigList.stream()).toList();
 		if(targetSNPList.size() != snpList.size()) {
 			System.out.println("List sizes are not equal");
 			return false;
 		}
 		start = System.nanoTime();
-		if(fileSigSNPList == null) {
-			for(int i = 0; i < sigSNPList.size(); i++) {
-				if(i % 10 == 0) {
-					System.out.println("Iteration " + i);
-				}
-				SNP firstSNP = sigSNPList.get(i);
-				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
-					double mi;
-					if(isContinuous) {
-						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
-					}
-					else {
-						mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
-					}
-					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
-					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
-				}).collect(Collectors.toList());
-				topResults.addAll(tempResults);
+		for(int i = 0; i < effectiveSigSNPList.size(); i++) {
+			if(i % 10 == 0) {
+				System.out.println("Iteration " + i);
 			}
-		}
-		else {
-			for(int i = 0; i < fileSigSNPList.size(); i++) {
-				if(i % 10 == 0) {
-					System.out.println("Iteration " + i);
-				}
-				SNP firstSNP = fileSigSNPList.get(i);
-				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
-					double mi;
-					if(isContinuous) {
-						mi = MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP);
-					}
-					else {
-						mi = MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
-					}
-					double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
-					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
-				}).collect(Collectors.toList());
-				topResults.addAll(tempResults);
-			}
+			SNP firstSNP = effectiveSigSNPList.get(i);
+			List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
+				double mi = isContinuous
+						? MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP)
+						: MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
+				double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
+				return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
+			}).toList();
+			topResults.addAll(tempResults);
 		}
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Writing results to file");
+		
 		try(PrintWriter outPW = new PrintWriter(Files.newBufferedWriter(outFile))) {
 			outPW.println("SNP1 + SNP2 MI MI_APC");
 			while(!topResults.isEmpty()) {
