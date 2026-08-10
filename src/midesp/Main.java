@@ -386,7 +386,7 @@ public class Main {
 			outPW.println("SNP1 + SNP2 MI MI_APC");
 			while(!topResults.isEmpty()) {
 				MIResult result = topResults.poll();
-				outPW.println(result.toNoAPCString());
+				outPW.println(result);
 			}
 		}
 		catch(IOException e) {
