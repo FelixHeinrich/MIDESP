@@ -64,7 +64,7 @@ public class Main {
 			return false;
 		}
 		System.setProperty("java.util.concurrent.ForkJoinPool.common.parallelism", Integer.toString(threadCount));
-		List<String> fileSigSNPIDsList = null;
+		Set<String> fileSigSNPIDsSet = null;
 		List<SNP> fileSigSNPList = null;
 		List<SNP> snpList;
 		Phenotype pheno;
@@ -79,7 +79,9 @@ public class Main {
 				pheno.readContCovariateFile(contCovariatesFile);
 			}
 			if(snpListFile != null) {
-				fileSigSNPIDsList = Files.lines(snpListFile).toList();
+				try(Stream<String> lines = Files.lines(snpListFile)){
+					fileSigSNPIDsSet = lines.collect(Collectors.toSet());
+				}
 			}
 		}
 		catch(IOException e) {
@@ -90,15 +92,14 @@ public class Main {
 		}
 		System.out.println("Read phenotypes for " + pheno.getLength() + " samples");
 		System.out.println("Read data of " + snpList.size() + " SNPs");
-		if(fileSigSNPIDsList != null) {
-			List<String> allSNPIDs = snpList.parallelStream().map(SNP::getID).distinct().toList();
-			long foundCount = fileSigSNPIDsList.parallelStream().filter(snp -> allSNPIDs.contains(snp)).count();
+		if(fileSigSNPIDsSet != null) {
+			Set<String> sigIDsSet = fileSigSNPIDsSet;
+			long foundCount = snpList.parallelStream().map(SNP::getID).filter(sigIDsSet::contains).count();
 			System.out.println("Using " + foundCount + " SNPs from the given list as important instead of using the SNPs that are significant according to their MI value");
-			if(foundCount != fileSigSNPIDsList.size()) {
-				System.out.println((fileSigSNPIDsList.size()-foundCount) + " SNPs from the list could not be found in the tped file and will be ignored");
+			if(foundCount != fileSigSNPIDsSet.size()) {
+				System.out.println((fileSigSNPIDsSet.size()-foundCount) + " SNPs from the list could not be found in the tped file and will be ignored");
 			}
-			List<String> tmpList = fileSigSNPIDsList;
-			fileSigSNPList = snpList.parallelStream().filter(snp -> tmpList.contains(snp.getID())).toList();
+			fileSigSNPList = snpList.parallelStream().filter(snp -> sigIDsSet.contains(snp.getID())).toList();
 		}
 		System.out.println("Phenotype = " + (isContinuous ? "Continuous" : "Discrete"));
 		if(isContinuous) {

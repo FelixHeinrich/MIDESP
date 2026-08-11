@@ -1,6 +1,7 @@
 package midesp.objects;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -8,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import midesp.methods.MICalculator;
 
@@ -101,22 +103,32 @@ public class SNP {
 	}
 	
 	public static List<SNP> readTPed(Path tpedFile) throws IOException{
-		return Files.lines(tpedFile).parallel().map(line ->{
-			String[] tmpArr = line.split(" ");
-			SNP tmpSNP = new SNP(tmpArr[1], (tmpArr.length-4)/2);
-			Map<String,Byte> gtMap = new HashMap<>();
-			byte counter = 0;
-			for(int i = 0; i < tmpArr.length-4; i+=2) {
-				String value = tmpArr[i+4]+tmpArr[i+5];
-				if(!gtMap.containsKey(value)) {
-					gtMap.put(value,counter);
-					counter++;
+		try(Stream<String> lines = Files.lines(tpedFile)) {
+			return lines.parallel().map(line ->{
+				String[] tmpArr = line.split(" ");
+				SNP tmpSNP = new SNP(tmpArr[1], (tmpArr.length-4)/2);
+				Map<String,Byte> gtMap = new HashMap<>();
+				byte counter = 0;
+				for(int i = 0; i < tmpArr.length-4; i+=2) {
+					String value = tmpArr[i+4]+tmpArr[i+5];
+					if(!gtMap.containsKey(value)) {
+						gtMap.put(value,counter);
+						counter++;
+					}
+					tmpSNP.setGenotypeAt(i / 2, gtMap.get(value));
 				}
-				tmpSNP.setGenotypeAt(i / 2, gtMap.get(value));
-			}
-			tmpSNP.parseValues(counter);
-			return tmpSNP;
-		}).collect(Collectors.toList());
+				tmpSNP.parseValues(counter);
+				return tmpSNP;
+			}).collect(Collectors.toMap(
+					SNP::getID,
+					snp -> snp,
+					(existing, duplicate) ->{
+						throw new UncheckedIOException(new IOException("Duplicate SNP ID found in tped file: " + existing.getID()));
+					}
+			)).values().stream().toList();	
+		} catch (UncheckedIOException e) {
+	        throw e.getCause();
+	    }
 	}
 	
 	@Override
