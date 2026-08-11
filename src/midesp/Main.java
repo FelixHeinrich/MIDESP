@@ -23,7 +23,7 @@ import midesp.objects.MIResult;
 import midesp.methods.SignificanceFinder;
 
 public class Main {
-
+	
 	private static Path tpedFile, tfamFile, outFile, snpListFile, discCovariatesFile, contCovariatesFile;
 	
 	private static boolean isContinuous = false;
@@ -33,7 +33,7 @@ public class Main {
 	
 	private static double keepPercentage = 1;
 	
-	private static int threadCount = Runtime.getRuntime().availableProcessors() / 2;
+	private static int threadCount = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
 	private static int kNext = 30;
 	private static int apcAverageNumber = 5000;
 	private static double fdr = 0.005;
@@ -357,101 +357,76 @@ public class Main {
 	}
 	
 	private static void parseArgs(String[] args) throws IllegalArgumentException{
-		Path tmpOutFile = null;
-		for(int i = 0; i < args.length - 2; i++){
-			switch(args[i]){
-			case "-keep":
-				keepPercentage = Double.parseDouble(args[i+1]);
+		int i = 0;
+		while(i < args.length - 2) {
+			switch(args[i]) {
+			case "-keep" ->{
+				keepPercentage = Double.parseDouble(args[++i]);
 				if(keepPercentage <= 0 || keepPercentage > 100) {
-					throw new IllegalArgumentException("Value for -keep needs to be in the intervall (0;100]");
-				}
-				i++;
-				break;
-			case "-cont":
-				isContinuous = true;
-				break;
-			case "-apc":
-				apcAverageNumber = Integer.parseInt(args[i+1]);
+					throw new IllegalArgumentException("Value for -keep needs to be in the intervall (0, 100]");
+				}	
+			}
+			case "-cont" -> isContinuous = true;
+			case "-apc" ->{
+				apcAverageNumber = Integer.parseInt(args[++i]);
 				if(apcAverageNumber < 1) {
 					throw new IllegalArgumentException("Value for -apc needs to be greater than 0");
 				}
-				i++;
-				break;
-			case "-k":
-				kNext = Integer.parseInt(args[i+1]);
+			}
+			case "-k" ->{
+				kNext = Integer.parseInt(args[++i]);
 				if(kNext < 1) {
 					throw new IllegalArgumentException("Value for -k needs to be greater than 0");
 				}
-				i++;
-				break;
-			case "-fdr":
-				fdr = Double.parseDouble(args[i+1]);
-				if(fdr <= 0) {
-					throw new IllegalArgumentException("Value for -fdr needs to be positive");
+			}
+			case "-fdr" ->{
+				fdr = Double.parseDouble(args[++i]);
+				if(fdr <= 0 || fdr > 1) {
+					throw new IllegalArgumentException("Value for -fdr needs to be in the interval (0, 1]");
 				}
-				i++;
-				break;
-			case "-out":
-				tmpOutFile = Paths.get(args[i+1]);
-				i++;
-				break;
-			case "-threads":
-				threadCount = Integer.parseInt(args[i+1]);
-				i++;
-				break;
-			case "-list":
-				snpListFile = Paths.get(args[i+1]);
-				i++;
-				break;
-			case "-disccovariates":
-				discCovariatesFile = Paths.get(args[i+1]);
-				i++;
-				break;
-			case "-contcovariates":
-				contCovariatesFile = Paths.get(args[i+1]);
-				i++;
-				break;
-			case "-noapc":
-				isNoAPC = true;
-				break;
-			case "-noepi":
-				isNoEpi = true;
-				break;				
-			case "-all":
-				isPrintAll = true;
-				break;
-			}	
+			}
+            case "-threads" -> {
+            	threadCount = Integer.parseInt(args[++i]);
+            	if(threadCount < 1) {
+					throw new IllegalArgumentException("Value for -threads needs to be at least 1");
+				}
+            }
+			case "-out" -> outFile = Paths.get(args[++i]);
+            case "-list" -> snpListFile = Paths.get(args[++i]);
+            case "-disccovariates" -> discCovariatesFile = Paths.get(args[++i]);
+            case "-contcovariates" -> contCovariatesFile = Paths.get(args[++i]);
+            case "-noapc" -> isNoAPC = true;
+            case "-noepi" -> isNoEpi = true;
+            case "-all" -> isPrintAll = true;
+            default -> throw new IllegalArgumentException("Unknown option: " + args[i]);
+			}
 		}
 		tpedFile = Paths.get(args[args.length-2]);
 		tfamFile = Paths.get(args[args.length-1]);
-		if(tmpOutFile == null) {
-			if(isNoAPC) {
-				outFile = Paths.get(args[args.length-2] + ".epiNoAPC");
-			}
-			else {
-				outFile = Paths.get(args[args.length-2] + ".epi");
-			}
-		}
-		else {
-			outFile = tmpOutFile;
+		if(outFile == null) {
+			outFile = Paths.get(args[args.length-2] + (isNoAPC ? ".epiNoAPC" : ".epi"));
 		}
 	}
+	
 	private static void printHelp(){
-		System.out.println("Usage: java -jar MIDESP.jar {Options} tpedFile tfamFile");
-		System.out.println("Options:");
-		System.out.println("-out\t\tfile\tname of outputfile (default tpedFile.epi)");
-		System.out.println("-threads\tnumber\tnumber of threads to use (default = Number_of_Cores / 2)");
-		System.out.println("-keep\t\tnumber\tkeep only the top X percentage pairs with highest MI (default = 1)");
-		System.out.println("-cont\t\t\tindicate that the phenotype is continuous");
-		System.out.println("-k\t\tnumber\tset the value of k for MI estimation for continuous phenotypes (default = 30)");
-		System.out.println("-fdr\t\tnumber\tset the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)");
-		System.out.println("-apc\t\tnumber\tset the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)");
-		System.out.println("-list\t\tfile\tname of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value");
-		System.out.println("-disccovariates\tfile\tname of file that contains discrete covariate variables for the samples as tab-separated list");
-		System.out.println("-contcovariates\tfile\tname of file that contains continuous covariate variables for the samples as tab-separated list");
-		System.out.println("-noapc\t\t\tindicate that the APC should not be applied");
-		System.out.println("-noepi\t\t\tindicate that no epistatic SNP pairs should be calculated");
-		System.out.println("-all\t\t\twrite an additional file containing the MI values for all SNPs (outputfile.allSNPs)");
+		System.out.println("""
+				Usage: java -jar MIDESP.jar {Options} tpedFile tfamFile
+				
+				Options:
+				-out            file    name of outputfile (default tpedFile.epi)
+				-threads        number  number of threads to use (default = Number_of_Cores / 2)
+				-keep           number  keep only the top X percentage pairs with highest MI (default = 1)
+				-cont                   indicate that the phenotype is continuous
+				-k              number  set the value of k for MI estimation for continuous phenotypes (default = 30)
+				-fdr            number  set the value of the false discovery rate for finding significantly associated SNPs (default = 0.005)
+				-apc            number  set the number of samples that should be used to estimate the average effects of the SNPs (default = 5000)
+				-list           file    name of file with list of SNP IDs to analyze instead of using the SNPs that are significant according to their MI value
+				-disccovariates	file    name of file that contains discrete covariate variables for the samples as tab-separated list
+				-contcovariates	file    name of file that contains continuous covariate variables for the samples as tab-separated list
+				-noapc                  indicate that the APC should not be applied
+				-noepi                  indicate that no epistatic SNP pairs should be calculated
+				-all                    write an additional file containing the MI values for all SNPs (outputfile.allSNPs)
+				""");
 	}
 	
 }
