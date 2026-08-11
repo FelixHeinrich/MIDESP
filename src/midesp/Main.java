@@ -79,7 +79,7 @@ public class Main {
 				pheno.readContCovariateFile(contCovariatesFile);
 			}
 			if(snpListFile != null) {
-				fileSigSNPIDsList = Files.lines(snpListFile).collect(Collectors.toList());
+				fileSigSNPIDsList = Files.lines(snpListFile).toList();
 			}
 		}
 		catch(IOException e) {
@@ -91,14 +91,14 @@ public class Main {
 		System.out.println("Read phenotypes for " + pheno.getLength() + " samples");
 		System.out.println("Read data of " + snpList.size() + " SNPs");
 		if(fileSigSNPIDsList != null) {
-			List<String> allSNPIDs = snpList.parallelStream().map(SNP::getID).distinct().collect(Collectors.toList());
+			List<String> allSNPIDs = snpList.parallelStream().map(SNP::getID).distinct().toList();
 			long foundCount = fileSigSNPIDsList.parallelStream().filter(snp -> allSNPIDs.contains(snp)).count();
 			System.out.println("Using " + foundCount + " SNPs from the given list as important instead of using the SNPs that are significant according to their MI value");
 			if(foundCount != fileSigSNPIDsList.size()) {
 				System.out.println((fileSigSNPIDsList.size()-foundCount) + " SNPs from the list could not be found in the tped file and will be ignored");
 			}
 			List<String> tmpList = fileSigSNPIDsList;
-			fileSigSNPList = snpList.parallelStream().filter(snp -> tmpList.contains(snp.getID())).collect(Collectors.toList());
+			fileSigSNPList = snpList.parallelStream().filter(snp -> tmpList.contains(snp.getID())).toList();
 		}
 		System.out.println("Phenotype = " + (isContinuous ? "Continuous" : "Discrete"));
 		if(isContinuous) {
@@ -119,7 +119,7 @@ public class Main {
 			}
 			snp.setMItoPheno(mi);
 			return mi;
-		}).collect(Collectors.toList());
+		}).toList();
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		System.out.println("Calculated single SNP association values");
 		/**TEMP_TO_DELETE**/
@@ -142,7 +142,7 @@ public class Main {
 			snpList.get(i).setPValue(singleSNPMI_SigFinderResult.getPValues().get(i));
 		}
 		System.out.println("Calculated pvalues for single SNP association");
-		List<SNP> sigSNPList = singleSNPMI_SigFinderResult.getSignificantIndices().parallelStream().map(idx -> snpList.get(idx)).collect(Collectors.toList());
+		List<SNP> sigSNPList = singleSNPMI_SigFinderResult.getSignificantIndices().parallelStream().map(idx -> snpList.get(idx)).toList();
 		System.out.println("Number of significantly associated single SNPs = " + sigSNPList.size());
 		System.out.println("Writing significantly associated single SNPs to file");
 		try(PrintWriter sigSNPPW = new PrintWriter(Files.newBufferedWriter(Paths.get(outFile.toAbsolutePath().toString() + ".sigSNPs")))) {
@@ -241,7 +241,7 @@ public class Main {
 		System.out.println("Done in " + (System.nanoTime() - start) / 1_000_000_000 / 60 + " minutes");
 		start = System.nanoTime();
 		System.out.println("Calculating single average effect for background SNPs");
-		List<SNP> backgroundSNPList = singleSNPMI_SigFinderResult.getBackgroundIndices().parallelStream().map(idx -> snpList.get(idx)).collect(Collectors.toList());
+		List<SNP> backgroundSNPList = singleSNPMI_SigFinderResult.getBackgroundIndices().parallelStream().map(idx -> snpList.get(idx)).toList();
 		List<Integer> randSNPIdxList = IntStream.range(0, backgroundSNPList.size()).boxed().collect(Collectors.toList());
 		Collections.shuffle(randSNPIdxList);
 		double backgroundMeanEffect = randSNPIdxList.subList(0, sigSNPList.size()).parallelStream().mapToDouble(idx ->{
