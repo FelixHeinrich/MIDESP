@@ -400,6 +400,7 @@ public class Main {
             case "-all" -> isPrintAll = true;
             default -> throw new IllegalArgumentException("Unknown option: " + args[i]);
 			}
+			i++;
 		}
 		tpedFile = Paths.get(args[args.length-2]);
 		tfamFile = Paths.get(args[args.length-1]);
