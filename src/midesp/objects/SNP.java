@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -15,10 +16,10 @@ import midesp.methods.MICalculator;
 
 public class SNP {
 
-	private String id;
-	private int length;
+	private final String id;
+	private final int length;
+	private final int[] genotypesArray;
 	private int[] genotypesCounts;
-	private int[] genotypesArray;
 	private int bitLength;
 	private int bitMax;
 	private double entropyNats;
@@ -111,11 +112,12 @@ public class SNP {
 				byte counter = 0;
 				for(int i = 0; i < tmpArr.length-4; i+=2) {
 					String value = tmpArr[i+4]+tmpArr[i+5];
-					if(!gtMap.containsKey(value)) {
-						gtMap.put(value,counter);
-						counter++;
+					Byte mappedValue = gtMap.get(value);
+					if(mappedValue == null) {
+						mappedValue = counter++;
+						gtMap.put(value,mappedValue);
 					}
-					tmpSNP.setGenotypeAt(i / 2, gtMap.get(value));
+					tmpSNP.setGenotypeAt(i / 2, mappedValue);
 				}
 				tmpSNP.parseValues(counter);
 				return tmpSNP;
@@ -124,7 +126,8 @@ public class SNP {
 					snp -> snp,
 					(existing, duplicate) ->{
 						throw new UncheckedIOException(new IOException("Duplicate SNP ID found in tped file: " + existing.getID()));
-					}
+					},
+					LinkedHashMap::new
 			)).values().stream().toList();	
 		} catch (UncheckedIOException e) {
 	        throw e.getCause();
@@ -138,29 +141,15 @@ public class SNP {
 	
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + Arrays.hashCode(genotypesArray);
-		result = prime * result + ((id == null) ? 0 : id.hashCode());
-		return result;
+		return id.hashCode();
 	}
 	
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
-		if (obj == null)
+		if (!(obj instanceof SNP other))
 			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		SNP other = (SNP) obj;
-		if (!Arrays.equals(genotypesArray, other.genotypesArray))
-			return false;
-		if (id == null) {
-			if (other.id != null)
-				return false;
-		} else if (!id.equals(other.id))
-			return false;
-		return true;
+		return Objects.equals(id, other.id);
 	}
 }
