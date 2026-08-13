@@ -18,6 +18,7 @@ import midesp.methods.MICalculator;
 import midesp.objects.Phenotype;
 import midesp.objects.SNP;
 import midesp.objects.SigFinderResult;
+import midesp.objects.EntropyCache;
 import midesp.objects.LimitedPriorityQueue;
 import midesp.objects.MIResult;
 import midesp.methods.SignificanceFinder;
@@ -68,8 +69,11 @@ public class Main {
 		List<SNP> fileSigSNPList = null;
 		List<SNP> snpList;
 		Phenotype pheno;
+		EntropyCache entropyCache;
 		System.out.println("Reading data from files");
 		try {
+			int sampleCount = (int) Files.lines(tfamFile).count();
+			entropyCache = new EntropyCache(sampleCount);
 			snpList = SNP.readTPed(tpedFile);
 			pheno = Phenotype.readTFam(tfamFile, isContinuous);
 			if(discCovariatesFile != null) {
@@ -113,10 +117,10 @@ public class Main {
 		List<Double> singleSNPMI = snpList.parallelStream().map(snp ->{
 			double mi;
 			if(isContinuous) {
-				mi = MICalculator.calcMI_ContPheno(pheno, kNext, snp);
+				mi = MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, snp);
 			}
 			else {
-				mi = MICalculator.calcMI_DiscPheno(pheno, kNext, snp);
+				mi = MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, snp);
 			}
 			snp.setMItoPheno(mi);
 			return mi;
@@ -195,8 +199,8 @@ public class Main {
 				SNP firstSNP = effectiveSigSNPList.get(i);
 				List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
 					double mi = isContinuous
-							? MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP)
-							: MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
+							? MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, firstSNP, secondSNP)
+							: MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, firstSNP, secondSNP);
 					return new MIResult(firstSNP.getID(), secondSNP.getID(), mi);
 				}).toList();
 				topResults.addAll(tempResults);
@@ -231,10 +235,10 @@ public class Main {
 			double sum = 0.0;
 			for(int i = 0; i < apcAverageNumber; i++) {
 				if(isContinuous) {
-					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			snp.setAverageMItoPheno(sum / apcAverageNumber);
@@ -252,10 +256,10 @@ public class Main {
 			double sum = 0.0;
 			for(int i = 0; i < apcAverageNumber; i++) {
 				if(isContinuous) {
-					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			return sum / apcAverageNumber;
@@ -273,10 +277,10 @@ public class Main {
 			double sum = 0.0;
 			for(int i = 0; i < apcAverageNumber; i++) {
 				if(isContinuous) {
-					sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 				else {
-					sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+					sum += MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 				}
 			}
 			return sum / apcAverageNumber;
@@ -295,10 +299,10 @@ public class Main {
 				double sum = 0.0;
 				for(int i = 0; i < apcAverageNumber; i++) {
 					if(isContinuous) {
-						sum += MICalculator.calcMI_ContPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+						sum += MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 					}
 					else {
-						sum += MICalculator.calcMI_DiscPheno(pheno, kNext, snp, snpList.get(randIndices.get(i)));
+						sum += MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, snp, snpList.get(randIndices.get(i)));
 					}
 				}
 				snp.setAverageMItoPheno(sum / apcAverageNumber);
@@ -327,8 +331,8 @@ public class Main {
 			SNP firstSNP = effectiveSigSNPList.get(i);
 			List<MIResult> tempResults = targetSNPList.subList(i, targetSNPList.size()).parallelStream().map(secondSNP ->{
 				double mi = isContinuous
-						? MICalculator.calcMI_ContPheno(pheno, kNext, firstSNP, secondSNP)
-						: MICalculator.calcMI_DiscPheno(pheno, kNext, firstSNP, secondSNP);
+						? MICalculator.calcMI_ContPheno(entropyCache,pheno, kNext, firstSNP, secondSNP)
+						: MICalculator.calcMI_DiscPheno(entropyCache,pheno, kNext, firstSNP, secondSNP);
 				double mi_apc = mi - (firstSNP.getAverageMItoPheno() * secondSNP.getAverageMItoPheno() / overallMeanEffect);
 				return new MIResult(firstSNP.getID(), secondSNP.getID(), mi, mi_apc);
 			}).toList();

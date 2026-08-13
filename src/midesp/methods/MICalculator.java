@@ -4,8 +4,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.stream.IntStream;
 
-import org.apache.commons.math3.special.Gamma;
-
+import midesp.objects.EntropyCache;
 import midesp.objects.Phenotype;
 import midesp.objects.SNP;
 
@@ -28,10 +27,6 @@ public class MICalculator {
 		}
 		double diff = max - min;
 		return Arrays.stream(orgVec).map(val -> (val - min) / diff).toArray();
-	}
-	
-	public static double calcDigamma(double value) {
-		return Gamma.digamma(value);
 	}
 	
 	/**
@@ -65,12 +60,27 @@ public class MICalculator {
 	}
 	
 	/**
+	 * Calculates entropy of given frequencies and returns it in Nats
+	 * @param freqVec	array containing the frequencies of the values
+	 * @param cache		EntropyCache containing precalculated results for all possible frequencies
+	 * @return
+	 */
+	public static double calcEntropyInNatsFromFreqs_Cached(int[] freqVec, EntropyCache cache) {
+		double entropy = 0.0;
+		for(int x : freqVec){
+			entropy += cache.get(x);
+		}	
+		return -entropy;
+	}
+	
+	/**
 	 * Calculates NMI(X;Y)
+	 * @param cache as an EntropyCache containing precalculated results for all possible frequencies
 	 * @param phenotype	as discrete Y
 	 * @param snps	as discrete X 
 	 * @return
 	 */
-	public static double calcMI_DiscPheno(Phenotype phenotype, int k, SNP... snps) {
+	public static double calcMI_DiscPheno(EntropyCache cache, Phenotype phenotype, int k, SNP... snps) {
 		int sampleCount;
 		int xBitLength, xBitMax;
 		int[] xVec;
@@ -138,7 +148,7 @@ public class MICalculator {
 			}
 			xBitLength = (int) Math.ceil(Math.log(maxValue+1) / logtwo);
 			xBitMax = maxValue+1;
-			xEntropyInNats = calcEntropyInNatsFromFreqs(xCounts,sampleCount);
+			xEntropyInNats = calcEntropyInNatsFromFreqs_Cached(xCounts,cache);
 		}
 		else {
 			Arrays.sort(snps, new Comparator<SNP>() { 
@@ -170,7 +180,7 @@ public class MICalculator {
 			}
 			xBitLength = (int) Math.ceil(Math.log(maxValue+1) / logtwo);
 			xBitMax = maxValue+1;
-			xEntropyInNats = calcEntropyInNatsFromFreqs(xCounts,sampleCount);
+			xEntropyInNats = calcEntropyInNatsFromFreqs_Cached(xCounts,cache);
 		}
 		if(phenotype.hasDiscCovariate()) {
 			if(phenotype.hasContCovariate()) {
@@ -222,7 +232,7 @@ public class MICalculator {
 					}
 				}
 				//H(X) + H(Y) - H(X,Y)
-				nats = xEntropyInNats + yEntropyInNats - calcEntropyInNatsFromFreqs(xyCounts,sampleCount);
+				nats = xEntropyInNats + yEntropyInNats - calcEntropyInNatsFromFreqs_Cached(xyCounts,cache);
 			}
 		}
 		xEntropyInLog2 = xEntropyInNats / logtwo;
@@ -230,7 +240,6 @@ public class MICalculator {
 		mi = Math.min(Math.max(natsInLog2, 0.0), xEntropyInLog2);
 		return 2 * (mi / (normFactor + xEntropyInLog2));
 	}
-	
 	/**
 	 * Calculates MI(X;Y|V)
 	 * @param phenotype	as discrete Y
@@ -661,11 +670,12 @@ public class MICalculator {
 	
 	/**
 	 * Calculates NMI(X;Y)
+	 * @param cache as an EntropyCache containing precalculated results for all possible frequencies
 	 * @param phenotype	as continuous Y
 	 * @param snps	as discrete X 
 	 * @return
 	 */
-	public static double calcMI_ContPheno(Phenotype phenotype, int k, SNP... snps) {
+	public static double calcMI_ContPheno(EntropyCache cache, Phenotype phenotype, int k, SNP... snps) {
 		int sampleCount;
 		int numClasses;
 		int xBitLength, xBitMax;
@@ -729,7 +739,7 @@ public class MICalculator {
 			}
 			xBitLength = (int) Math.ceil(Math.log(maxValue+1) / logtwo);
 			xBitMax = maxValue+1;
-			xEntropyInNats = calcEntropyInNatsFromFreqs(xCounts,sampleCount);
+			xEntropyInNats = calcEntropyInNatsFromFreqs_Cached(xCounts,cache);
 		}
 		else {
 			Arrays.sort(snps, new Comparator<SNP>() { 
@@ -761,7 +771,7 @@ public class MICalculator {
 			}
 			xBitLength = (int) Math.ceil(Math.log(maxValue+1) / logtwo);
 			xBitMax = maxValue+1;
-			xEntropyInNats = calcEntropyInNatsFromFreqs(xCounts,sampleCount);
+			xEntropyInNats = calcEntropyInNatsFromFreqs_Cached(xCounts,cache);
 		}
 		if(phenotype.hasDiscCovariate()) {
 			if(phenotype.hasContCovariate()) {

@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import org.apache.commons.math3.special.Gamma;
+
 import midesp.methods.MICalculator;
 
 
@@ -204,7 +206,7 @@ public class Phenotype{
 				}).toArray();
 			}).toArray(double[][]::new);
 			//Precalculate all possible digamma values needed for this phenotype 
-			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> MICalculator.calcDigamma(i)).toArray();
+			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> Gamma.digamma(i)).toArray();
 		}
 		else {
 			Map<Integer,Byte> bitMap = new HashMap<>();
@@ -353,7 +355,7 @@ public class Phenotype{
 			}).toArray();
 		}).toArray(double[][]::new);
 		if(!isContinuous) {
-			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> MICalculator.calcDigamma(i)).toArray();
+			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> Gamma.digamma(i)).toArray();
 		}
 		hasContCovariate = true;
 	}
