@@ -17,23 +17,22 @@ import org.apache.commons.math3.special.Gamma;
 
 import midesp.methods.MICalculator;
 
-
-public class Phenotype{
+/**
+ * Legacy Phenotype representation retained for comparison and validation
+ * against the GeneralizedBitSet implementation.
+ */
+public class Phenotype_Legacy{
 
 	private String id;
 	private int length;
 	private boolean isContinuous;
 	private boolean hasDiscCovariate;
 	private boolean hasContCovariate;
-	private GeneralizedBitSet discPhenotypeBitSet;
-	private GeneralizedBitSet discCovariateBitSet;
-	private GeneralizedBitSet discPhenotype_discCovariateBitSet;
 	private int[] discPhenotypeVec;
 	private int[] discCovariate_bitValues;
 	private int[] discCovariate_bitCounts;
 	private int[] discPhenotype_discCovariate_bitValues;
 	private int[] discPhenotype_discCovariate_bitCounts;
-	private int[] discPhenotypeCounts;
 	private int[] bitValues;
 	private int[] bitCounts;
 	private int bitLength;
@@ -54,7 +53,7 @@ public class Phenotype{
 	private double[][] closestNeighborsDistMat;
 	private double[][] contCovariate_ClosestNeighborsDistMat;
 	
-	public Phenotype(String id, int length, boolean continuous) {
+	public Phenotype_Legacy(String id, int length, boolean continuous) {
 		this.id = id;
 		this.length = length;
 		isContinuous = continuous;
@@ -84,7 +83,9 @@ public class Phenotype{
 		return hasContCovariate;
 	}
 	
-	
+	public int getDiscCovariateCount() {
+		return discCovariate_Count;
+	}
 	
 	public int getContCovariateCount() {
 		return contCovariate_Count;
@@ -94,16 +95,8 @@ public class Phenotype{
 		return contPhenotypeVec;
 	}
 	
-	public GeneralizedBitSet getDiscPhenotype() {
-		return discPhenotypeBitSet;
-	}
-	
-	public GeneralizedBitSet getDiscCovariate() {
-		return discCovariateBitSet;
-	}
-	
-	public GeneralizedBitSet getDiscPhenotype_DiscCovariate() {
-		return discPhenotype_discCovariateBitSet;
+	public int[] getDiscPhenotype() {
+		return discPhenotypeVec;
 	}
 	
 	public double getDiscPhenotypeEntropyNats() {
@@ -120,10 +113,6 @@ public class Phenotype{
 	
 	public int[] getDiscPhenotypeBitValues() {
 		return bitValues;
-	}
-	
-	public int[] getDiscPhenotypeCounts() {
-		return discPhenotypeCounts;
 	}
 	
 	public int[] getDiscPhenotypeBitCounts() {
@@ -223,27 +212,29 @@ public class Phenotype{
 			digammaValuesArray = IntStream.range(0, length+1).mapToDouble(i -> Gamma.digamma(i)).toArray();
 		}
 		else {
-			/**TODO: Allow strings as values for a discrete phenotype**/
-			int[] tmpPhenotypes = new int[length];
-			Map<Integer,Byte> phenoMap = new HashMap<>();
+			Map<Integer,Byte> bitMap = new HashMap<>();
 			byte counter = 0;
+			bitValues = new int[length];
 			for(int i = 0; i < length; i++) {
-				Byte mappedValue = phenoMap.get(discPhenotypeVec[i]);
-				if(mappedValue == null) {
-					mappedValue = counter++;
-					phenoMap.put(discPhenotypeVec[i],mappedValue);
+				if(!bitMap.containsKey(discPhenotypeVec[i])) {
+					bitMap.put(discPhenotypeVec[i], counter);
+					counter++;
 				}
-				tmpPhenotypes[i] = mappedValue;
+				bitValues[i] = bitMap.get(discPhenotypeVec[i]);
 			}
-			discPhenotypeBitSet = new GeneralizedBitSet(tmpPhenotypes, counter);
-	        discPhenotypeCounts = discPhenotypeBitSet.getClassCounts();
-	        discPhenotypeEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(discPhenotypeCounts, length);
+			bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
+			bitMax = counter-1;
+			discPhenotypeEntropyNats = MICalculator.calcEntropyInNats(bitValues,counter);
+			bitCounts = new int[counter];
+			for(int i = 0; i < length; i++) {
+				bitCounts[bitValues[i]]++;
+			}
 		}
 	}
 	
-	public static Phenotype readTFam(Path tfamFile, boolean isContinuous) throws IOException {
+	public static Phenotype_Legacy readTFam(Path tfamFile, boolean isContinuous) throws IOException {
 		List<String> values = Files.lines(tfamFile).map(line -> line.split(" ")[5]).collect(Collectors.toList());
-		Phenotype pheno = new Phenotype("Phenotype", values.size(), isContinuous);
+		Phenotype_Legacy pheno = new Phenotype_Legacy("Phenotype", values.size(), isContinuous);
 		for(int i = 0; i < values.size(); i++) {
 			pheno.setValueAt(i, values.get(i));
 		}
@@ -252,15 +243,11 @@ public class Phenotype{
 	}
 	
 	public void readDiscCovariateFile(Path covariateFile) throws IOException{
-		List<String[]> covariateList;
-		try(Stream<String> lines = Files.lines(covariateFile)){
-			covariateList = lines.map(str -> str.split("\t")).toList();
-		}
+		List<String[]> covariateList = Files.lines(covariateFile).map(str -> str.split("\t")).toList();
 		if(covariateList.size() != this.length) {
 			throw new IOException("Number of values for covariate (" + covariateList.size() + ") is different from number of samples (" + this.length + ")");
 		}
 		discCovariate_Count = covariateList.get(0).length;
-		
 		System.out.println("Reading " + discCovariate_Count + " discrete covariate" + (discCovariate_Count > 1 ? "s" : ""));
 		for(int i = 1; i < covariateList.size(); i++) {
 			if(discCovariate_Count != covariateList.get(i).length) {
@@ -268,21 +255,55 @@ public class Phenotype{
 			}
 		}
 		
-		int[] combinedValues = new int[this.length];
-		Map<String, Integer> valueToNumber = new HashMap<>();
-		for(int i = 0; i < this.length; i++) {
-			String combinedValue = String.join("\t", covariateList.get(i));
-			combinedValues[i] = valueToNumber.computeIfAbsent(combinedValue, key -> valueToNumber.size());
+		int[][] covariateMat = new int[this.length][discCovariate_Count];
+		for(int i = 0; i < discCovariate_Count; i++) {
+			Map<String, Integer> valueToNumber = new HashMap<>();
+			for(int j = 0; j < this.length; j++) {
+				String value = covariateList.get(j)[i];
+				if(!valueToNumber.containsKey(value)) {
+					valueToNumber.put(value, valueToNumber.size());
+				}
+				covariateMat[j][i] = valueToNumber.get(value);
+			}
 		}
-		
-		int numClasses = valueToNumber.size();
-		this.discCovariateBitSet = new GeneralizedBitSet(combinedValues, numClasses);
-		
-		this.discCovariateEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(this.discCovariateBitSet.getClassCounts(), this.length);
-		
+		this.discCovariate_bitValues = new int[this.length];
+		//Combine the different discrete covariates to a single covariate
+		Map<String, Byte> valueToNumber = new HashMap<>();
+		byte counter = 0;
+		for(int i = 0; i < this.length; i++) {
+			String combinedValue = Arrays.toString(covariateMat[i]);
+			if(!valueToNumber.containsKey(combinedValue)) {
+				valueToNumber.put(combinedValue, counter);
+				counter++;
+			}
+			this.discCovariate_bitValues[i] = valueToNumber.get(combinedValue);
+		}
+		discCovariate_bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
+		discCovariate_bitMax = counter-1;
+		discCovariateEntropyNats = MICalculator.calcEntropyInNats(discCovariate_bitValues,counter);
+		discCovariate_bitCounts = new int[counter];
+		for(int i = 0; i < length; i++) {
+			discCovariate_bitCounts[discCovariate_bitValues[i]]++;
+		}
 		if(!isContinuous) {
-			this.discPhenotype_discCovariateBitSet = GeneralizedBitSet.combineTwo(this.discCovariateBitSet, this.discPhenotypeBitSet);
-			this.discPhenotype_discCovariate_JointEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(this.discPhenotype_discCovariateBitSet.getClassCounts(), this.length);
+			discPhenotype_discCovariate_bitValues = new int[this.length];
+			valueToNumber = new HashMap<>();
+			counter = 0;
+			for(int i = 0; i < this.length; i++) {
+				String combinedValue = discCovariate_bitValues[i] + "_" + bitValues[i];
+				if(!valueToNumber.containsKey(combinedValue)) {
+					valueToNumber.put(combinedValue, counter);
+					counter++;
+				}
+				discPhenotype_discCovariate_bitValues[i] = valueToNumber.get(combinedValue); 
+			}
+			discPhenotype_discCovariate_bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
+			discPhenotype_discCovariate_bitMax = counter-1;
+			discPhenotype_discCovariate_JointEntropyNats = MICalculator.calcEntropyInNats(discPhenotype_discCovariate_bitValues, counter);
+			discPhenotype_discCovariate_bitCounts = new int[counter];
+			for(int i = 0; i < length; i++) {
+				discPhenotype_discCovariate_bitCounts[discPhenotype_discCovariate_bitValues[i]]++;
+			}
 		}
 		hasDiscCovariate = true;
 	}

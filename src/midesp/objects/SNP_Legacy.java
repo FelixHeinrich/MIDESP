@@ -14,26 +14,27 @@ import java.util.stream.Stream;
 
 import midesp.methods.MICalculator;
 
-public class SNP {
+/**
+ * Legacy SNP representation retained for comparison and validation
+ * against the GeneralizedBitSet implementation.
+ */
+public class SNP_Legacy {
 
 	private final String id;
 	private final int length;
-	
-	private GeneralizedBitSet bitSet;
-	private GeneralizedBitSet snpDiscCovariateBitSet;
-	private GeneralizedBitSet snpDiscPhenoDiscCovariateBitSet;
-
+	private final int[] genotypesArray;
 	private int[] genotypesCounts;
+	private int bitLength;
+	private int bitMax;
 	private double entropyNats;
-	private double discCovariate_JointEntropyNats;
-	private double discPhenoDiscCovariate_JointEntropyNats;
 	private double miToPheno;
 	private double averageMiToPheno;
 	private double pvalue;
 	
-	public SNP(String id, int length) {
+	public SNP_Legacy(String id, int length) {
 		this.id = id;
 		this.length = length;
+		genotypesArray = new int[length];
 	}
 
 	public String getID() {
@@ -44,42 +45,28 @@ public class SNP {
 		return length;
 	}
 	
-	public GeneralizedBitSet getBitSet() {
-        return bitSet;
-    }
-
-	public GeneralizedBitSet getSNPDiscCovariateBitSet() {
-		return snpDiscCovariateBitSet;
-	}
-
-	public void setSNPDiscCovariateBitSet(GeneralizedBitSet bitSet) {
-		snpDiscCovariateBitSet = bitSet;
-		discCovariate_JointEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(bitSet.getClassCounts(), length);
+	public int[] getGenotypes() {
+		return genotypesArray;
 	}
 	
-	public GeneralizedBitSet getSNPDiscPhenoDiscCovariateBitSet() {
-		return snpDiscPhenoDiscCovariateBitSet;
-	}
-
-	public void setSNPDiscPhenoDiscCovariateBitSet(GeneralizedBitSet bitSet) {
-		snpDiscPhenoDiscCovariateBitSet = bitSet;
-		discPhenoDiscCovariate_JointEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(bitSet.getClassCounts(), length);
+	public void setGenotypeAt(int idx, int genotype) {
+		genotypesArray[idx] = genotype;
 	}
 	
 	public int[] getGenotypesCounts() {
 		return genotypesCounts;
 	}
 	
+	public int getBitLength() {
+		return bitLength;
+	}
+	
+	public int getBitMax() {
+		return bitMax;
+	}
+	
 	public double getEntropyNats() {
 		return entropyNats;
-	}
-	
-	public double getDiscCovariateJointEntropyNats() {
-		return discCovariate_JointEntropyNats;
-	}
-	
-	public double getDiscPhenoDiscCovariateJointEntropyNats() {
-		return discPhenoDiscCovariate_JointEntropyNats;
 	}
 	
 	public double getEntropyLog2() {
@@ -110,19 +97,21 @@ public class SNP {
 		pvalue = p;
 	}
 	
-	public void initBitSet(int[] rawGenotypes, int numClasses) {
-		this.bitSet = new GeneralizedBitSet(rawGenotypes, numClasses);
-        this.genotypesCounts = this.bitSet.getClassCounts();
+	public void parseValues(byte counter) {
+		bitLength = (int) Math.ceil(Math.log(counter) / MICalculator.logtwo);
+		bitMax = counter-1;
+		genotypesCounts = new int[counter];
+		for(int i = 0; i < length; i++) {
+			genotypesCounts[genotypesArray[i]]++;
+		}
 		entropyNats = MICalculator.calcEntropyInNatsFromFreqs(genotypesCounts, length);
 	}
 	
-	public static List<SNP> readTPed(Path tpedFile) throws IOException{
+	public static List<SNP_Legacy> readTPed(Path tpedFile) throws IOException{
 		try(Stream<String> lines = Files.lines(tpedFile)) {
 			return lines.parallel().map(line ->{
 				String[] tmpArr = line.split(" ");
-				int sampleCount = (tmpArr.length - 4) / 2;
-				SNP tmpSNP = new SNP(tmpArr[1], sampleCount);
-				int[] rawGenotypes = new int[sampleCount];
+				SNP_Legacy tmpSNP = new SNP_Legacy(tmpArr[1], (tmpArr.length-4)/2);
 				Map<String,Byte> gtMap = new HashMap<>();
 				byte counter = 0;
 				for(int i = 0; i < tmpArr.length-4; i+=2) {
@@ -132,12 +121,12 @@ public class SNP {
 						mappedValue = counter++;
 						gtMap.put(value,mappedValue);
 					}
-					rawGenotypes[i / 2] = mappedValue;
+					tmpSNP.setGenotypeAt(i / 2, mappedValue);
 				}
-				tmpSNP.initBitSet(rawGenotypes, counter);
+				tmpSNP.parseValues(counter);
 				return tmpSNP;
 			}).collect(Collectors.toMap(
-					SNP::getID,
+					SNP_Legacy::getID,
 					snp -> snp,
 					(existing, duplicate) ->{
 						throw new UncheckedIOException(new IOException("Duplicate SNP ID found in tped file: " + existing.getID()));
@@ -163,7 +152,7 @@ public class SNP {
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
-		if (!(obj instanceof SNP other))
+		if (!(obj instanceof SNP_Legacy other))
 			return false;
 		return Objects.equals(id, other.id);
 	}
