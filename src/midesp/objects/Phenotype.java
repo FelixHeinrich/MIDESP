@@ -242,7 +242,10 @@ public class Phenotype{
 	}
 	
 	public static Phenotype readTFam(Path tfamFile, boolean isContinuous) throws IOException {
-		List<String> values = Files.lines(tfamFile).map(line -> line.split(" ")[5]).collect(Collectors.toList());
+		List<String> values;
+		try(Stream<String> lines = Files.lines(tfamFile)){
+			values = lines.map(line -> line.split(" ")[5]).collect(Collectors.toList());
+		}
 		Phenotype pheno = new Phenotype("Phenotype", values.size(), isContinuous);
 		for(int i = 0; i < values.size(); i++) {
 			pheno.setValueAt(i, values.get(i));
