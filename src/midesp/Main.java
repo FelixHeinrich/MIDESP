@@ -75,11 +75,6 @@ public class Main {
 		List<SNP> snpList;
 		Phenotype pheno;
 		EntropyCache entropyCache;
-		if(isContinuous) {
-			throw new UnsupportedOperationException(
-			        "Continuous phenotypes are not supported in the current implementation."
-			);
-		}
 		if(contCovariatesFile != null) {
 			throw new UnsupportedOperationException(
 			        "Continuous covariates are not supported in the current implementation."
@@ -127,8 +122,8 @@ public class Main {
 		System.out.println("FDR = " + fdr);
 		System.out.println("Number of samples used for APC = " + apcAverageNumber);
 		System.out.println("Number of threads = " + threadCount);
-		SNPCalculator singleMICalculator = MICalculator.resolveMICalculator(isContinuous, entropyCache, pheno);
-		SNPBiCalculator pairMICalculator = MICalculator.resolvePairMICalculator(isContinuous, entropyCache, pheno);
+		SNPCalculator singleMICalculator = MICalculator.resolveMICalculator(isContinuous, entropyCache, pheno, kNext);
+		SNPBiCalculator pairMICalculator = MICalculator.resolvePairMICalculator(isContinuous, entropyCache, pheno, kNext);
 		if(pheno.hasDiscCovariate()) {
 			System.out.println("Calculating joint entropy between SNPs and discrete covariate");
 			start = System.nanoTime();
@@ -219,7 +214,7 @@ public class Main {
 			}
 			start = System.nanoTime();
 			int chunkSize = (effectiveSigSNPList.size() + threadCount - 1) / threadCount;
-
+			
 			List<TopKHeap_MI> partialQueues = IntStream.range(0, threadCount).parallel().mapToObj(worker -> {
 				int startIdx = worker * chunkSize;
 				int endIdx = Math.min(startIdx + chunkSize, effectiveSigSNPList.size());
@@ -577,5 +572,4 @@ public class Main {
 				-all                    write an additional file containing the MI values for all SNPs (outputfile.allSNPs)
 				""");
 	}
-	
 }

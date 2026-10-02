@@ -94,4 +94,28 @@ public class GeneralizedBitSet {
 
         return new GeneralizedBitSet(activeMasks, activeCounts);
     }
+    
+    public int[] getClassValues(int sampleCount) {
+    	int[] values  = new int[sampleCount];
+
+    	for (int c = 0; c < masks.length; c++) {
+    		long[] mask = masks[c];
+
+    		for (int w = 0; w < mask.length; w++) {
+    			long word = mask[w];
+
+    			while (word != 0L) {
+    				int bit = Long.numberOfTrailingZeros(word);
+    				int sampleIdx = (w << 6) + bit;
+
+    				if (sampleIdx < sampleCount) {
+    					values[sampleIdx] = c;
+    				}
+
+    				word &= word - 1;
+    			}
+    		}
+    	}
+    	return values;
+    }
 }

@@ -81,7 +81,7 @@ public class MICalculator {
 	    double compute(SNP snp, double snpEntropy);
 	}
 	
-	public static SNPCalculator resolveMICalculator(boolean isContinuous, EntropyCache entropyCache, Phenotype pheno) {
+	public static SNPCalculator resolveMICalculator(boolean isContinuous, EntropyCache entropyCache, Phenotype pheno, int k) {
 	    if (isContinuous) { 
 		    if(pheno.hasDiscCovariate()) {
 		    	if(pheno.hasContCovariate()) {
@@ -92,7 +92,12 @@ public class MICalculator {
 		    if(pheno.hasContCovariate()) {
 		    	throw new UnsupportedOperationException("Continuous phenotypes with continuous covariate are currently not supported");
 		    }
-		    throw new UnsupportedOperationException("Continuous phenotypes are currently not supported");
+		    return (snp, snpEntropy) ->
+		    calcMI_OneSNP_ContPheno(
+		    		entropyCache, 
+		    		pheno, 
+		    		k, 
+		    		snp);
 
 	    } else {
 	    	if(pheno.hasDiscCovariate()) {
@@ -129,7 +134,7 @@ public class MICalculator {
 	    double compute(SNP first, SNP second);
 	}
 	
-	public static SNPBiCalculator resolvePairMICalculator(boolean isContinuous, EntropyCache entropyCache, Phenotype pheno) {
+	public static SNPBiCalculator resolvePairMICalculator(boolean isContinuous, EntropyCache entropyCache, Phenotype pheno, int k) {
 	    if (isContinuous) {
 	    	if(pheno.hasDiscCovariate()) {
 		    	if(pheno.hasContCovariate()) {
@@ -140,7 +145,13 @@ public class MICalculator {
 		    if(pheno.hasContCovariate()) {
 		    	throw new UnsupportedOperationException("Continuous phenotypes with continuous covariate are currently not supported");
 		    }
-		    throw new UnsupportedOperationException("Continuous phenotypes are currently not supported");
+		    return (first, second) ->
+		    calcMI_TwoSNPs_ContPheno(
+		    		entropyCache, 
+		    		pheno, 
+		    		k, 
+		    		first, 
+		    		second);
 	    } else {
 	    	if(pheno.hasDiscCovariate()) {
 	    		if(pheno.hasContCovariate()) {
@@ -544,6 +555,10 @@ public class MICalculator {
 		return 2 * (mi / (singleSNPNormFactor + xEntropyInLog2));
 	}
 	
+	public static double calcMI_OneSNP_ContPheno(EntropyCache cache, Phenotype phenotype, int k, SNP snp) {
+		return calcMI_ContPheno_Core(cache, phenotype, k, snp.getGenotypesValues(), snp.getGenotypesCounts(), snp.getBitSet().getNumClasses(), snp.getEntropyNats(), singleSNPNormFactor);
+	}
+	
 	public static double calcCMI_OneSNP_DiscPheno_DiscCovariate(SNP snp, double phenoCovariateJointEntropy, double covariateEntropy) {		
 		double nats = snp.getDiscCovariateJointEntropyNats() + phenoCovariateJointEntropy - snp.getDiscPhenoDiscCovariateJointEntropyNats() - covariateEntropy;
 		double xGivenZEntropyInLog2 = (snp.getDiscCovariateJointEntropyNats() - covariateEntropy) / logtwo;
@@ -597,6 +612,36 @@ public class MICalculator {
 		double natsInLog2 = nats / logtwo;
 		double mi = Math.min(Math.max(natsInLog2, 0.0), xEntropyInLog2);
 		return 2 * (mi / (snpPairNormFactor + xEntropyInLog2));
+	}
+	
+	public static double calcMI_TwoSNPs_ContPheno(EntropyCache cache, Phenotype phenotype, int k, SNP snp1, SNP snp2) {
+		int[] x1 = snp1.getGenotypesValues();
+		int[] x2 = snp2.getGenotypesValues();
+		
+		int c1Count = snp1.getBitSet().getNumClasses();
+		int c2Count = snp2.getBitSet().getNumClasses();
+		
+		int[] x12 = new int[x1.length];
+		int[] x12Counts = new int[c1Count * c2Count];
+
+	    for (int i = 0; i < x1.length; i++) {
+	    	int value = x1[i] * c2Count + x2[i];
+
+	        x12[i] = value;
+
+	        x12Counts[value]++;
+	    }
+
+		int activeNumClasses = 0;
+		for(int count : x12Counts) {
+			if(count != 0) {
+				activeNumClasses++;
+			}
+		}
+	    
+	    double xEntropyInNats = calcEntropyInNatsFromFreqs_Cached(x12Counts, cache);
+		
+		return calcMI_ContPheno_Core(cache, phenotype, k, x12, x12Counts, activeNumClasses, xEntropyInNats, snpPairNormFactor);
 	}
 	
 	public static double calcCMI_TwoSNPs_DiscPheno_DiscCovariate(EntropyCache cache, SNP snp1, SNP snp2, double phenoCovariateJointEntropy, double covariateEntropy) {
@@ -664,6 +709,75 @@ public class MICalculator {
 		double natsInLog2 = nats / logtwo;
 		double cmi = Math.min(Math.max(natsInLog2, 0.0), xGivenZEntropyInLog2);
 		return 2 * (cmi / (snpPairNormFactor + xGivenZEntropyInLog2));
+	}
+	
+	
+	private static double calcMI_ContPheno_Core(EntropyCache cache, Phenotype phenotype, int k, int[] xVec, int[] xCounts, int activeNumClasses, double xEntropyInNats, double normFactor) {
+		int sampleCount = phenotype.getLength();
+		int[] effectiveK = new int[xCounts.length];
+	    for(int c = 0; c < xCounts.length; c++) {
+	        effectiveK[c] = (xCounts[c] < k + 1) ? xCounts[c] - 1 : k; //If less than k neighbours, then set k to max. available neighbour
+	    }
+		//Continuous Phenotype k-NN / Digamma Estimator
+		double[] digammaValues = phenotype.getDigammaArray();
+		int[][] yClosestNeighbours = phenotype.getClosestNeighborsMat();
+		double[][] yClosestNeighboursDist = phenotype.getClosestNeighborsDistMat();
+		double y_DigammaSum = 0.0;
+		double y_X_DigammaSum = 0.0;
+		double n_DigammaAvg = digammaValues[sampleCount];
+		double n_X_DigammaSum = 0.0;
+		for(int i = 0; i < sampleCount; i++) {
+			int currentX = xVec[i];
+			int currentK = effectiveK[currentX];
+			if(currentK == 0) { //Case of no neighbour (xCounts == 1)
+				//Correction according to the example code provided by Brian C. Ross	
+				y_DigammaSum += digammaValues[activeNumClasses * 2];
+				y_X_DigammaSum += digammaValues[1];
+				n_X_DigammaSum += digammaValues[1];
+				continue;
+			}
+			//Find distance to k-th neighbour for phenotype
+			int[] neighbours = yClosestNeighbours[i];
+			double[] distances = yClosestNeighboursDist[i];
+			int tmpCounter = 0;
+			int kthNeighbour_Pheno = 0;
+			for(int j = 1; j < sampleCount; j++) {
+				if(xVec[neighbours[j]] == currentX) {
+					tmpCounter++;
+					kthNeighbour_Pheno = j;
+					if(tmpCounter == currentK) {
+						break;
+					}
+				}
+			}
+			double epsilonDist = distances[kthNeighbour_Pheno];
+
+			//Count samples closer than epsilon(i)
+			int nY = kthNeighbour_Pheno;
+			int nY_X = tmpCounter;
+			for(int j = kthNeighbour_Pheno + 1; j < sampleCount; j++) {
+				if(distances[j] <= epsilonDist){
+					//For both without considering X
+					nY++;
+					if(xVec[neighbours[j]] == currentX) {
+						//For both considering X
+						nY_X++;
+					}
+				}
+				else {
+					break;
+				}
+			}
+			y_DigammaSum += digammaValues[nY];
+			y_X_DigammaSum += digammaValues[nY_X];
+			n_X_DigammaSum += digammaValues[xCounts[currentX]];
+		}
+		double nats = - (y_DigammaSum / sampleCount) + (y_X_DigammaSum / sampleCount) + n_DigammaAvg - (n_X_DigammaSum / sampleCount);	
+
+		double xEntropyInLog2 = xEntropyInNats / logtwo;
+		double natsInLog2 = nats / logtwo;
+		double mi = Math.min(Math.max(natsInLog2, 0.0), xEntropyInLog2);
+		return 2 * (mi / (normFactor + xEntropyInLog2));
 	}
 	
 	/**
