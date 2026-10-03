@@ -25,6 +25,7 @@ public class SNP {
 
 	private int[] genotypesCounts;
 	private int[] genotypesValues;
+	private int[] snpDiscCovariateValues;
 	private double entropyNats;
 	private double discCovariate_JointEntropyNats;
 	private double discPhenoDiscCovariate_JointEntropyNats;
@@ -56,6 +57,7 @@ public class SNP {
 	public void setSNPDiscCovariateBitSet(GeneralizedBitSet bitSet) {
 		snpDiscCovariateBitSet = bitSet;
 		discCovariate_JointEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(bitSet.getClassCounts(), length);
+		snpDiscCovariateValues = snpDiscCovariateBitSet.getClassValues(length);
 	}
 	
 	public GeneralizedBitSet getSNPDiscPhenoDiscCovariateBitSet() {
@@ -73,6 +75,10 @@ public class SNP {
 	
 	public int[] getGenotypesValues() {
 		return genotypesValues;
+	}
+	
+	public int[] getSNPDiscCovariateValues() {
+		return snpDiscCovariateValues;
 	}
 	
 	public double getEntropyNats() {

@@ -29,24 +29,17 @@ public class Phenotype{
 	private GeneralizedBitSet discCovariateBitSet;
 	private GeneralizedBitSet discPhenotype_discCovariateBitSet;
 	private int[] discPhenotypeVec;
-	private int[] discCovariate_bitValues;
-	private int[] discCovariate_bitCounts;
-	private int[] discPhenotype_discCovariate_bitValues;
-	private int[] discPhenotype_discCovariate_bitCounts;
+	private int[] discCovariateValues;
+	private int[] discCovariateCounts;
 	private int[] discPhenotypeCounts;
-	private int[] bitValues;
-	private int[] bitCounts;
-	private int bitLength;
-	private int bitMax;
 	private int contCovariate_Count;
 	private int discCovariate_Count;
 	private int discCovariate_bitLength;
 	private int discCovariate_bitMax;
-	private int discPhenotype_discCovariate_bitLength;
-	private int discPhenotype_discCovariate_bitMax;
 	private double discPhenotypeEntropyNats;
 	private double discCovariateEntropyNats;
 	private double discPhenotype_discCovariate_JointEntropyNats;
+	private double discCovariate_AvgDigamma;
 	private double[] contPhenotypeVec;
 	private double[] digammaValuesArray;
 	private int[][] closestNeighborsMat;
@@ -110,24 +103,8 @@ public class Phenotype{
 		return discPhenotypeEntropyNats;
 	}
 	
-	public int getDiscPhenotypeBitMax() {
-		return bitMax;
-	}
-	
-	public int getDiscPhenotypeBitLength() {
-		return bitLength;
-	}
-	
-	public int[] getDiscPhenotypeBitValues() {
-		return bitValues;
-	}
-	
 	public int[] getDiscPhenotypeCounts() {
 		return discPhenotypeCounts;
-	}
-	
-	public int[] getDiscPhenotypeBitCounts() {
-		return bitCounts;
 	}
 	
 	public int[][] getClosestNeighborsMat(){
@@ -137,7 +114,6 @@ public class Phenotype{
 	public double[][] getClosestNeighborsDistMat(){
 		return closestNeighborsDistMat;
 	}
-	
 
 	public int[][] getContCovariate_ClosestNeighborsMat(){
 		return contCovariate_ClosestNeighborsMat;
@@ -151,12 +127,12 @@ public class Phenotype{
 		return digammaValuesArray;
 	}
 	
-	public int[] getDiscCovariateBitValues() {
-		return discCovariate_bitValues;
+	public int[] getDiscCovariateValues() {
+		return discCovariateValues;
 	}
 
-	public int[] getDiscCovariateBitCounts() {
-		return discCovariate_bitCounts;
+	public int[] getDiscCovariateCounts() {
+		return discCovariateCounts;
 	}
 	public int getDiscCovariateBitMax() {
 		return discCovariate_bitMax;
@@ -174,20 +150,8 @@ public class Phenotype{
 		return discPhenotype_discCovariate_JointEntropyNats;
 	}
 	
-	public int getDiscPhenotype_DiscCovariate_BitLength() {
-		return discPhenotype_discCovariate_bitLength;
-	}
-
-	public int getDiscPhenotype_DiscCovariate_BitMax() {
-		return discPhenotype_discCovariate_bitMax;
-	}
-
-	public int[] getDiscPhenotype_DiscCovariate_BitValues() {
-		return discPhenotype_discCovariate_bitValues;
-	}
-	
-	public int[] getDiscPhenotype_DiscCovariate_BitCounts() {
-		return discPhenotype_discCovariate_bitCounts;
+	public double getDiscCovariateAvgDigamma() {
+		return discCovariate_AvgDigamma;
 	}
 
 	public void setValueAt(int idx, String value) {
@@ -280,12 +244,21 @@ public class Phenotype{
 		
 		int numClasses = valueToNumber.size();
 		this.discCovariateBitSet = new GeneralizedBitSet(combinedValues, numClasses);
+		this.discCovariateCounts = this.discCovariateBitSet.getClassCounts();
+		this.discCovariateValues = this.discCovariateBitSet.getClassValues(this.length);
 		
 		this.discCovariateEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(this.discCovariateBitSet.getClassCounts(), this.length);
 		
 		if(!isContinuous) {
 			this.discPhenotype_discCovariateBitSet = GeneralizedBitSet.combineTwo(this.discCovariateBitSet, this.discPhenotypeBitSet);
 			this.discPhenotype_discCovariate_JointEntropyNats = MICalculator.calcEntropyInNatsFromFreqs(this.discPhenotype_discCovariateBitSet.getClassCounts(), this.length);
+		} else {
+			int[] vCounts = this.discCovariateBitSet.getClassCounts();
+			double nVDigammaSum = 0.0;
+			for(int count : vCounts) {
+				nVDigammaSum += count * digammaValuesArray[count];
+			}
+			this.discCovariate_AvgDigamma = nVDigammaSum / this.length;
 		}
 		hasDiscCovariate = true;
 	}
